@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Sidebar scrollbar styling (match dark sidebar background) */
+.sidebar-scrollbar {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(148, 163, 184, 0.35) #0a1326; /* thumb track */
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: #0a1326;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  border: 3px solid #0a1326; /* creates padded thumb + blends with track */
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.45);
+}
+
+/* Hide scrollbar but keep scrollability */
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
