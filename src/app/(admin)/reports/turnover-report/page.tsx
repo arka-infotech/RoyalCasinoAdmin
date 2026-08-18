@@ -559,7 +559,7 @@ export default function TurnoverReportPage() {
           ) : null}
 
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[620px] overflow-hidden rounded-md border border-gray-200 bg-gray-100 md:min-w-[720px]">
+            <div className="min-w-78 overflow-hidden rounded-md border border-gray-200 bg-gray-100 md:min-w-90">
               <div className="grid grid-cols-5 overflow-hidden rounded-md">
                 <div className="bg-linear-to-r from-purple-600 to-indigo-500 px-2 py-1.5 text-center text-[11px] font-semibold text-white md:px-4 md:py-2 md:text-xs">
                   Total PlayPoints

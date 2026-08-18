@@ -252,7 +252,7 @@ export default function OnlinePlayersPage() {
                   <td className="border border-gray-200 px-3 py-3">{row.endPoints}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.netProfitPoints}</td>
                   <td className="border border-gray-200 px-3 py-3">
-                    <span className={`inline-flex min-w-[64px] justify-center rounded px-3 py-1 text-xs font-semibold text-white ${row.isOnline ? "bg-green-500" : "bg-rose-500"}`}>
+                    <span className={`inline-flex min-w-16 justify-center rounded px-3 py-1 text-xs font-semibold text-white ${row.isOnline ? "bg-green-500" : "bg-rose-500"}`}>
                       {row.isOnline ? "Online" : "Offline"}
                     </span>
                   </td>
@@ -326,7 +326,7 @@ export default function OnlinePlayersPage() {
                   <td className="border border-gray-200 px-3 py-3">{row.endPoints}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.netProfitPoints}</td>
                   <td className="border border-gray-200 px-3 py-3">
-                    <span className="inline-flex min-w-[64px] justify-center rounded bg-rose-500 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="inline-flex min-w-16 justify-center rounded bg-rose-500 px-3 py-1 text-xs font-semibold text-white">
                       Offline
                     </span>
                   </td>

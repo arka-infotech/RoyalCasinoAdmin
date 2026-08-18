@@ -325,7 +325,7 @@ export default function Sidebar({
         <span className="shrink-0 w-8 flex justify-center">
           <IconForHref
             href={href}
-            className={["h-[19px] w-[19px]", "text-current opacity-85"].join(
+            className={["h-4.75 w-4.75", "text-current opacity-85"].join(
               " "
             )}
           />
@@ -416,9 +416,9 @@ export default function Sidebar({
               onClick={onToggleDesktop}
               className="rounded-md p-2 text-slate-200 hover:bg-white/5 hover:text-white"
             >
-              <span className="block h-[2px] w-5 bg-current" />
-              <span className="mt-1.5 block h-[2px] w-5 bg-current" />
-              <span className="mt-1.5 block h-[2px] w-5 bg-current" />
+              <span className="block h-0.5 w-5 bg-current" />
+              <span className="mt-1.5 block h-0.5 w-5 bg-current" />
+              <span className="mt-1.5 block h-0.5 w-5 bg-current" />
             </button>
           </div>
         </div>
@@ -441,7 +441,7 @@ export default function Sidebar({
                     ].join(" ")}
                   >
                     <span className="shrink-0 w-8 flex justify-center">
-                      <IconDownload className="h-[18px] w-[18px] text-current opacity-85" />
+                      <IconDownload className="h-4.5 w-4.5 text-current opacity-85" />
                     </span>
                     <span
                       className={[
@@ -463,7 +463,7 @@ export default function Sidebar({
                         isExpanded ? "opacity-100" : "opacity-0 pointer-events-none",
                       ].join(" ")}
                     >
-                      <IconChevronDown className="h-5 w-5" />
+                      <IconChevronDown className="h-2.5 w-2.5" />
                     </span>
                   </button>
 
@@ -538,9 +538,9 @@ export default function Sidebar({
               className="rounded-md p-2 text-slate-200 hover:bg-white/5 hover:text-white"
               aria-label="Close menu"
             >
-              <span className="block h-[2px] w-5 bg-current" />
-              <span className="mt-1.5 block h-[2px] w-5 bg-current" />
-              <span className="mt-1.5 block h-[2px] w-5 bg-current" />
+              <span className="block h-0.5 w-5 bg-current" />
+              <span className="mt-1.5 block h-0.5 w-5 bg-current" />
+              <span className="mt-1.5 block h-0.5 w-5 bg-current" />
             </button>
           </div>
         </div>
@@ -563,7 +563,7 @@ export default function Sidebar({
                     ].join(" ")}
                   >
                     <span className="shrink-0 w-8 flex justify-center">
-                      <IconDownload className="h-[18px] w-[18px] text-current opacity-85" />
+                      <IconDownload className="h-4.5 w-4.5 text-current opacity-85" />
                     </span>
                     <span
                       className={[
