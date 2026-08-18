@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import { useRetailers, useDeleteUser, useBlockUser, useUnblockUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
+import DrillDownUsername from "@/components/admin/DrillDownUsername";
 import type { User } from "@/types/user";
 
 type ActionKey = "edit" | "changePassword" | "view" | "disable" | "delete";
@@ -194,7 +195,9 @@ export default function RetailerPage() {
               currentEntries.map((row, idx) => (
                 <tr key={row.id} className="text-gray-700">
                   <td className="border border-gray-200 px-3 py-3">{startIndex + idx + 1}</td>
-                  <td className="border border-gray-200 px-3 py-3">{row.username}</td>
+                  <td className="border border-gray-200 px-3 py-3">
+                    <DrillDownUsername id={row.id} username={row.username} role={row.role} returnTo="/management/retailer" />
+                  </td>
                   <td className="border border-gray-200 px-3 py-3">{row.parent_username ?? "—"}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.unique_id ?? "—"}</td>
                   <td className="border border-gray-200 px-3 py-3">{Number(row.chips ?? 0).toLocaleString()}</td>

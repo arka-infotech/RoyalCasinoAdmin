@@ -54,7 +54,6 @@ const HIDDEN_ITEMS_BY_ROLE: Record<string, string[]> = {
     '/management/super-distributor',
     '/management/distributor',
     '/management/retailer',
-    '/management/users',
     '/game/win-percentage',
     ...ADMIN_ONLY,
   ],

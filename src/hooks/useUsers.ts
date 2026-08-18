@@ -3,6 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userService } from "@/services/user.service";
 import type { CreateUserFormData, EditUserFormData } from "@/validators/auth.validator";
+import { getDirectChildRole } from "@/lib/hierarchyDrillDown";
+import type { UserRole } from "@/types/user";
 import { toast } from "sonner";
 
 type UpdateUserPayload = Partial<EditUserFormData> & { parentId?: string; isBlocked?: boolean };
@@ -32,10 +34,12 @@ export function useUsers(parentId?: string) {
   });
 }
 
-export function useDownline(parentId?: string) {
+export function useDownline(parentId?: string, parentRole?: UserRole) {
+  const childRole = parentRole ? getDirectChildRole(parentRole) : null;
+  const roleParam = Array.isArray(childRole) ? childRole.join(",") : (childRole ?? "retailer,user");
   return useQuery({
-    queryKey: ["users", "downline", parentId],
-    queryFn: () => userService.getUsers({ role: "retailer,user", ...(parentId && { parent_id: parentId }), limit: 500 }),
+    queryKey: ["users", "downline", parentId, roleParam],
+    queryFn: () => userService.getUsers({ role: roleParam, ...(parentId && { parent_id: parentId }), limit: 500 }),
     enabled: !!parentId,
   });
 }

@@ -7,7 +7,7 @@ import { useTurnoverReport } from "@/hooks/useGames";
 import { reportService } from "@/services/game.service";
 import { useAuth } from "@/hooks/useAuth";
 import type { UserRole } from "@/types/user";
-import { parseDrillPath, serializeDrillPath, type DrillPathNode } from "@/lib/hierarchyDrillDown";
+import { parseDrillPath, serializeDrillPath, getDirectChildRole, type DrillPathNode } from "@/lib/hierarchyDrillDown";
 
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import { SortableTh } from "@/components/admin/SortableTh";
@@ -35,6 +35,7 @@ type ApiTurnoverRow = {
   retailer_commission_rate: string | number;
   distributor_commission_rate: string | number;
   super_commission_rate: string | number;
+  own_commission_amount?: string | number;
   retailer_commission_amount?: string | number;
   distributor_commission_amount?: string | number;
   super_commission_amount?: string | number;
@@ -57,6 +58,7 @@ type TurnoverRow = {
   playPoint: number;
   winPoint: number;
   endPoint: number;
+  ownCommission: number;
   retailerCommission: number;
   superCommission: number;
   distributorCommission: number;
@@ -74,6 +76,7 @@ function getCommissionVisibilityForRole(role: UserRole): {
   showSuperCommission: boolean;
   showDistributorCommission: boolean;
   showRetailerCommission: boolean;
+  showOwnCommission: boolean;
 } {
   return {
     showSuperCommission: role === "admin" || role === "super_distributor",
@@ -84,20 +87,10 @@ function getCommissionVisibilityForRole(role: UserRole): {
       role === "super_distributor" ||
       role === "distributor" ||
       role === "retailer",
+    // The bettor's own-level tier (user) sits below every panel role, so it's always visible
+    // to any panel viewer, same as retailer commission was when retailer was the leaf role.
+    showOwnCommission: true,
   };
-}
-
-function getDirectChildRole(role: UserRole): UserRole | UserRole[] | null {
-  switch (role) {
-    case "admin":
-      return "super_distributor";
-    case "super_distributor":
-      return "distributor";
-    case "distributor":
-      return ["retailer", "user"];
-    default:
-      return null;
-  }
 }
 
 const quickRanges: Array<{ key: QuickRangeKey; label: string }> = [
@@ -298,6 +291,7 @@ export default function TurnoverReportPage() {
     const raw = (reportData?.data?.report ?? []) as ApiTurnoverRow[];
     return raw.map((r) => {
       const playPoint = Number(r.play_amount);
+      const ownCommission = Number(r.own_commission_amount ?? 0);
       const retailerCommission = Number(r.retailer_commission_amount ?? 0);
       const distributorCommission = Number(r.distributor_commission_amount ?? 0);
       const superCommission = Number(r.super_commission_amount ?? 0);
@@ -308,6 +302,7 @@ export default function TurnoverReportPage() {
         playPoint,
         winPoint: Number(r.win_amount),
         endPoint: Number(r.end_amount),
+        ownCommission,
         retailerCommission,
         superCommission,
         distributorCommission,
@@ -315,7 +310,7 @@ export default function TurnoverReportPage() {
     });
   }, [reportData]);
 
-  const { showSuperCommission, showDistributorCommission, showRetailerCommission } =
+  const { showSuperCommission, showDistributorCommission, showRetailerCommission, showOwnCommission } =
     getCommissionVisibilityForRole(loginRole);
 
   const filteredRows = useMemo(() => {
@@ -335,6 +330,7 @@ export default function TurnoverReportPage() {
     if (sortKey === "net") {
       const netOf = (r: TurnoverRow) => {
         let comm = 0;
+        if (showOwnCommission) comm += r.ownCommission;
         if (showRetailerCommission) comm += r.retailerCommission;
         if (showDistributorCommission) comm += r.distributorCommission;
         if (showSuperCommission) comm += r.superCommission;
@@ -343,7 +339,7 @@ export default function TurnoverReportPage() {
       return [...filteredRows].sort((a, b) => compareForSort(netOf(a), netOf(b), sortDir));
     }
     return sortRowsByKey(filteredRows, sortKey as keyof TurnoverRow, sortDir);
-  }, [filteredRows, sortKey, sortDir, showRetailerCommission, showDistributorCommission, showSuperCommission]);
+  }, [filteredRows, sortKey, sortDir, showOwnCommission, showRetailerCommission, showDistributorCommission, showSuperCommission]);
 
   const totals = useMemo(() => {
     return filteredRows.reduce(
@@ -352,6 +348,7 @@ export default function TurnoverReportPage() {
           play: number;
           win: number;
           end: number;
+          ownCommission: number;
           actualRetailerCommission: number;
           superCommission: number;
           distributorCommission: number;
@@ -361,6 +358,7 @@ export default function TurnoverReportPage() {
         acc.play += r.playPoint;
         acc.win += r.winPoint;
         acc.end += r.endPoint;
+        acc.ownCommission += r.ownCommission;
         acc.actualRetailerCommission += r.retailerCommission;
         acc.superCommission += r.superCommission;
         acc.distributorCommission += r.distributorCommission;
@@ -370,6 +368,7 @@ export default function TurnoverReportPage() {
         play: 0,
         win: 0,
         end: 0,
+        ownCommission: 0,
         actualRetailerCommission: 0,
         superCommission: 0,
         distributorCommission: 0,
@@ -379,14 +378,17 @@ export default function TurnoverReportPage() {
 
   const totalCommission = useMemo(() => {
     let sum = 0;
+    if (showOwnCommission) sum += totals.ownCommission;
     if (showRetailerCommission) sum += totals.actualRetailerCommission;
     if (showDistributorCommission) sum += totals.distributorCommission;
     if (showSuperCommission) sum += totals.superCommission;
     return sum;
   }, [
+    totals.ownCommission,
     totals.actualRetailerCommission,
     totals.superCommission,
     totals.distributorCommission,
+    showOwnCommission,
     showRetailerCommission,
     showDistributorCommission,
     showSuperCommission,
@@ -403,13 +405,15 @@ export default function TurnoverReportPage() {
     showSuperCommission: exportShowSuperCommission,
     showDistributorCommission: exportShowDistributorCommission,
     showRetailerCommission: exportShowRetailerCommission,
+    showOwnCommission: exportShowOwnCommission,
   } = getCommissionVisibilityForRole(exportPerspectiveRole);
 
   const tableColumnCount =
     (isCombinedChildView ? 7 : 6) +
     (showSuperCommission ? 1 : 0) +
     (showDistributorCommission ? 1 : 0) +
-    (showRetailerCommission ? 1 : 0);
+    (showRetailerCommission ? 1 : 0) +
+    (showOwnCommission ? 1 : 0);
 
   const totalEntries = sortedRows.length;
   const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
@@ -439,6 +443,7 @@ export default function TurnoverReportPage() {
     if (exportShowSuperCommission) headers.push("Super Commission");
     if (exportShowDistributorCommission) headers.push("Distributor Commission");
     if (exportShowRetailerCommission) headers.push("Retailer Commission");
+    if (exportShowOwnCommission) headers.push("User Commission");
     headers.push("Net");
 
     const rows = currentEntries.map((row, idx) => {
@@ -461,6 +466,10 @@ export default function TurnoverReportPage() {
       if (exportShowRetailerCommission) {
         values.push(String(row.retailerCommission));
         commissionTotal += row.retailerCommission;
+      }
+      if (exportShowOwnCommission) {
+        values.push(String(row.ownCommission));
+        commissionTotal += row.ownCommission;
       }
 
       values.push(String(row.endPoint - commissionTotal));
@@ -486,6 +495,7 @@ export default function TurnoverReportPage() {
     exportShowDistributorCommission,
     exportShowRetailerCommission,
     exportShowSuperCommission,
+    exportShowOwnCommission,
     isCombinedChildView,
     startIndex,
   ]);
@@ -747,6 +757,17 @@ export default function TurnoverReportPage() {
                     Retailer Commission
                   </SortableTh>
                 )}
+                {showOwnCommission && (
+                  <SortableTh
+                    columnKey="ownCommission"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={requestSort}
+                    className="border border-gray-200 px-3 py-2"
+                  >
+                    User Commission
+                  </SortableTh>
+                )}
                 <SortableTh
                   columnKey="net"
                   sortKey={sortKey}
@@ -776,6 +797,7 @@ export default function TurnoverReportPage() {
                 if (showRetailerCommission) rowCommission += row.retailerCommission;
                 if (showDistributorCommission) rowCommission += row.distributorCommission;
                 if (showSuperCommission) rowCommission += row.superCommission;
+                if (showOwnCommission) rowCommission += row.ownCommission;
                 const net = row.endPoint - rowCommission;
                 return (
                   <tr key={row.id} className="text-gray-700">
@@ -819,6 +841,11 @@ export default function TurnoverReportPage() {
                     {showRetailerCommission && (
                       <td className="border border-gray-200 px-3 py-3">
                         {formatNumber(row.retailerCommission)}
+                      </td>
+                    )}
+                    {showOwnCommission && (
+                      <td className="border border-gray-200 px-3 py-3">
+                        {formatNumber(row.ownCommission)}
                       </td>
                     )}
                     <td className="border border-gray-200 px-3 py-3">{formatNumber(net)}</td>

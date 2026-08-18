@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useHierarchySuperDistributors, useDistributors } from "@/hooks/useUsers";
+import { useHierarchySuperDistributors, useDistributors, useHierarchyRetailers } from "@/hooks/useUsers";
 import type { AuthUser } from "@/providers/AuthProvider";
 import { userService } from "@/services/user.service";
 
@@ -23,6 +23,7 @@ export type EntityEditFormValues = {
   status: "active" | "deactive";
   superDistributorId?: string;
   distributorId?: string;
+  retailerId?: string;
   /** Backend game IDs that should be enabled */
   enabledGameIds: string[];
 };
@@ -59,7 +60,7 @@ export default function EntityEditForm({
   loggedInUser,
 }: Props) {
   const router = useRouter();
-  const showGames = role === "retailer" || role === "user";
+  const showGames = role === "user";
 
   const safeReturnTo = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -73,6 +74,8 @@ export default function EntityEditForm({
     loggedInUser?.role === "super_distributor" ? loggedInUser.id : undefined;
   const autoDistributorId =
     loggedInUser?.role === "distributor" ? loggedInUser.id : undefined;
+  const autoRetailerId =
+    loggedInUser?.role === "retailer" ? loggedInUser.id : undefined;
 
   const defaults = useMemo<EntityEditFormValues>(
     () => ({
@@ -82,6 +85,7 @@ export default function EntityEditForm({
       status: initialValues?.status ?? "active",
       superDistributorId: initialValues?.superDistributorId ?? autoSuperDistributorId ?? "",
       distributorId: initialValues?.distributorId ?? autoDistributorId ?? "",
+      retailerId: initialValues?.retailerId ?? autoRetailerId ?? "",
       enabledGameIds: initialValues?.enabledGameIds ?? [],
     }),
     [
@@ -91,9 +95,11 @@ export default function EntityEditForm({
       initialValues?.status,
       initialValues?.superDistributorId,
       initialValues?.distributorId,
+      initialValues?.retailerId,
       initialValues?.enabledGameIds,
       autoSuperDistributorId,
       autoDistributorId,
+      autoRetailerId,
     ],
   );
 
@@ -154,10 +160,12 @@ export default function EntityEditForm({
   }, [showGames, isEdit, entityId]);
 
   const needsSD = role === "distributor";
-  const needsDist = role === "retailer" || role === "user";
+  const needsDist = role === "retailer";
+  const needsRetailer = role === "user";
 
   const { data: sdData, isLoading: sdLoading } = useHierarchySuperDistributors();
   const { data: allDistData, isLoading: distLoading } = useDistributors();
+  const { data: allRetData, isLoading: retLoading } = useHierarchyRetailers();
 
   const superDistributors = (sdData ?? []) as {
     id: string;
@@ -165,6 +173,11 @@ export default function EntityEditForm({
     commission_rate: number;
   }[];
   const distributors = (allDistData?.data?.users ?? []) as {
+    id: string;
+    username: string;
+    commission_rate: number;
+  }[];
+  const retailers = (allRetData?.data?.users ?? []) as {
     id: string;
     username: string;
     commission_rate: number;
@@ -181,17 +194,26 @@ export default function EntityEditForm({
       const dist = distributors.find((d) => d.id === values.distributorId);
       return dist ? dist.commission_rate : 100;
     }
+    if (needsRetailer) {
+      if (autoRetailerId) return loggedInUser?.commissionRate ?? 100;
+      const ret = retailers.find((r) => r.id === values.retailerId);
+      return ret ? ret.commission_rate : 100;
+    }
     return 100;
   }, [
     needsSD,
     needsDist,
+    needsRetailer,
     autoSuperDistributorId,
     autoDistributorId,
+    autoRetailerId,
     loggedInUser,
     superDistributors,
     distributors,
+    retailers,
     values.superDistributorId,
     values.distributorId,
+    values.retailerId,
   ]);
 
   const toggleGame = (gameId: string) => {
@@ -303,7 +325,7 @@ export default function EntityEditForm({
                 className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-indigo-400"
                 placeholder="Enter commission"
               />
-              {(needsSD || needsDist) && (
+              {(needsSD || needsDist || needsRetailer) && (
                 <span className="mt-1 block text-xs text-gray-500">
                   Max allowed: {parentCommissionRate}%
                 </span>
@@ -412,6 +434,54 @@ export default function EntityEditForm({
                   {distributors.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.username}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+          )}
+
+          {needsRetailer && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-gray-700">Retailer :</span>
+              {autoRetailerId ? (
+                <input
+                  value={loggedInUser?.username ?? ""}
+                  readOnly
+                  className="w-full cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-500 outline-none"
+                />
+              ) : (
+                <select
+                  value={values.retailerId ?? ""}
+                  onChange={(e) => {
+                    const newRetId = e.target.value;
+                    const newRet = retailers.find((r) => r.id === newRetId);
+                    const newMax = newRet ? newRet.commission_rate : 100;
+                    const current = parseFloat(values.commission);
+                    if (!isNaN(current) && current > newMax) {
+                      setValues((v) => ({ ...v, retailerId: newRetId, commission: "" }));
+                      setCommissionWarning(
+                        `Parent commission is ${newMax}%. Please re-enter a valid commission.`,
+                      );
+                    } else {
+                      setValues((v) => ({ ...v, retailerId: newRetId }));
+                      setCommissionWarning(null);
+                    }
+                  }}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-indigo-400"
+                  required
+                  disabled={retLoading}
+                >
+                  <option value="">
+                    {retLoading
+                      ? "Loading..."
+                      : retailers.length === 0
+                        ? "No retailers found"
+                        : "Select Retailer"}
+                  </option>
+                  {retailers.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.username}
                     </option>
                   ))}
                 </select>

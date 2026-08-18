@@ -39,7 +39,7 @@ export default function UserEditPage({ params }: { params: Promise<{ id: string 
         password: user?.password ?? "",
         commission: "0",
         status: user?.is_blocked ? "deactive" : "active",
-        distributorId: user?.parent_id ?? "",
+        retailerId: user?.parent_id ?? "",
       }}
       onSubmit={async (values) => {
         const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean } = {

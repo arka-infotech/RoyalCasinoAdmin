@@ -25,19 +25,22 @@ export function getDirectChildRole(role: UserRole): UserRole | UserRole[] | null
     case "super_distributor":
       return "distributor";
     case "distributor":
-      return ["retailer", "user"];
+      return "retailer";
+    case "retailer":
+      return "user";
     default:
       return null;
   }
 }
 
 export function isDrillableRole(role: UserRole): boolean {
-  return role === "super_distributor" || role === "distributor";
+  return role === "super_distributor" || role === "distributor" || role === "retailer";
 }
 
 const DRILL_TARGET_PATH: Partial<Record<UserRole, string>> = {
   super_distributor: "/management/distributor",
   distributor: "/management/downline",
+  retailer: "/management/downline",
 };
 
 export function buildDrillDownUrl(
@@ -52,6 +55,7 @@ export function buildDrillDownUrl(
   const params = new URLSearchParams({
     parentId,
     parentName,
+    parentRole: role,
     returnTo,
   });
   return `${basePath}?${params.toString()}`;

@@ -27,8 +27,8 @@ export default function AddUserPage() {
           toast.error("Password must be at least 6 characters");
           return;
         }
-        if (!values.distributorId) {
-          toast.error("Please select a Distributor");
+        if (!values.retailerId) {
+          toast.error("Please select a Retailer");
           return;
         }
 
@@ -37,7 +37,7 @@ export default function AddUserPage() {
           password: values.password,
           role: "user",
           commissionRate: 0,
-          parentId: values.distributorId,
+          parentId: values.retailerId,
         });
 
         const newId = created.data?.user?.id;

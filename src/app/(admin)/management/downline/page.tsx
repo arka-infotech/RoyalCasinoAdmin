@@ -127,6 +127,7 @@ export default function DownlinePage() {
   const searchParams = useSearchParams();
   const parentId = searchParams.get("parentId") ?? undefined;
   const parentName = searchParams.get("parentName") ?? undefined;
+  const parentRole = (searchParams.get("parentRole") as UserRole | null) ?? undefined;
   const returnTo = searchParams.get("returnTo") ?? "/management/distributor";
 
   const { user: authUser } = useAuth();
@@ -144,7 +145,7 @@ export default function DownlinePage() {
     }
   }, [parentId, router]);
 
-  const { data, isLoading, error } = useDownline(parentId);
+  const { data, isLoading, error } = useDownline(parentId, parentRole);
   const deleteMutation = useDeleteUser();
   const blockMutation = useBlockUser();
   const unblockMutation = useUnblockUser();
@@ -185,7 +186,7 @@ export default function DownlinePage() {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900 md:text-xl">Retailer + User</h1>
+        <h1 className="text-lg font-semibold text-gray-900 md:text-xl">Downline</h1>
       </div>
 
       {parentName && (
@@ -229,7 +230,7 @@ export default function DownlinePage() {
               ))
             ) : currentEntries.length === 0 ? (
               <tr><td colSpan={8} className="border border-gray-200 px-3 py-8 text-center text-gray-500">
-                {searchQuery ? "No results found." : parentName ? `No retailers or users under ${parentName}.` : "No records found."}
+                {searchQuery ? "No results found." : parentName ? `No downline entries under ${parentName}.` : "No records found."}
               </td></tr>
             ) : (
               currentEntries.map((row, idx) => (
