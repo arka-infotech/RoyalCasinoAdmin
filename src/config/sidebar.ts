@@ -28,7 +28,17 @@ export const sidebarSections: MenuSection[] = [
   },
   {
     title: 'GAME',
-    items: [{ title: 'Win Percentage', href: '/game/win-percentage' }],
+    items: [
+      { title: 'Win Percentage', href: '/game/win-percentage' },
+      { title: 'Game History', href: '/game/game-history' },
+    ],
+  },
+  {
+    title: 'LIVE REPORTS',
+    items: [
+      { title: 'Lucky 12', href: '/live-reports/live-result/lucky-12' },
+      { title: 'Lucky 16', href: '/live-reports/live-result/lucky-16' },
+    ],
   },
   {
     title: 'LOGS ACTIVITY',
@@ -38,6 +48,9 @@ export const sidebarSections: MenuSection[] = [
 
 const ADMIN_ONLY = [
   '/game/win-percentage',
+  '/game/game-history',
+  '/live-reports/live-result/lucky-12',
+  '/live-reports/live-result/lucky-16',
   '/logs-activity/logs',
   '/reports/admin-commission-report',
 ];

@@ -4,6 +4,7 @@ import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
 import { getAdminFromCookies } from "@/lib/auth";
 import { writeActivityLog } from "@/lib/activityLog";
+import { getAuthToken } from "@/lib/backendProxy";
 
 function resolveBaseUrl() {
   return normalizeGameServerBaseUrl(
@@ -37,11 +38,13 @@ export async function POST(request: NextRequest) {
       "/api/admin/lucky-card/reset-balance",
       gameServerBasePath(),
     );
+    const token = await getAuthToken();
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(body),
       cache: "no-store",

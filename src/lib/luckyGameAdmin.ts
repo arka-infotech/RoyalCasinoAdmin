@@ -6,7 +6,7 @@ import io from "socket.io-client";
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
 
-/** Admin UI suit → backend single-letter suit (see sai-lucky-backend game.config.js). */
+/** Admin UI suit → backend single-letter suit (confirmed against RoyalCasino's Lucky12_Manager.cs / Lucky16_Manager.cs). */
 export type UiSuit = "heart" | "spade" | "diamond" | "club";
 
 export type LuckyGameVariant = "12" | "16";
@@ -16,9 +16,12 @@ export const LUCKY_GAME_TYPE: Record<LuckyGameVariant, string> = {
   "16": "LUCKY_CARD_16",
 };
 
+// Backend letter codes don't match the obvious guess — confirmed against the
+// player client's own mapping (Lucky12_Manager.cs / Lucky16_Manager.cs): 'c' is
+// Diamond and 'f' is Club.
 const SUIT_TO_BACKEND: Record<UiSuit, string> = {
-  club: "c",
-  diamond: "f",
+  club: "f",
+  diamond: "c",
   spade: "k",
   heart: "l",
 };
@@ -49,8 +52,8 @@ export function selectionKeyToWinCard(
 }
 
 const BACKEND_SUIT_TO_UI: Record<string, UiSuit> = {
-  c: "club",
-  f: "diamond",
+  c: "diamond",
+  f: "club",
   k: "spade",
   l: "heart",
 };

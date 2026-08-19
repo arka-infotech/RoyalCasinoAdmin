@@ -4,6 +4,7 @@ import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
 import { getAdminFromCookies } from "@/lib/auth";
 import { writeActivityLog } from "@/lib/activityLog";
+import { getAuthToken } from "@/lib/backendProxy";
 
 function resolveBaseUrl() {
   return normalizeGameServerBaseUrl(
@@ -39,10 +40,14 @@ export async function GET(request: NextRequest) {
     );
     url.searchParams.set("gameType", gameType);
 
+    const token = await getAuthToken();
     const res = await fetch(url.toString(), {
       method: "GET",
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
     const text = await res.text();
     if (!text.trim()) {
@@ -94,11 +99,13 @@ export async function POST(request: NextRequest) {
       "/api/admin/lucky-card/win-percentage",
       process.env.LUCKY_GAME_BASE_PATH ?? process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
     );
+    const token = await getAuthToken();
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ ...body, winRatePct: backendValue }),
       cache: "no-store",

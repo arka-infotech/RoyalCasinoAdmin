@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
+import { getAuthToken } from "@/lib/backendProxy";
 
 export async function GET(request: NextRequest) {
   const gameType = request.nextUrl.searchParams.get("gameType");
@@ -34,8 +35,10 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("gameType", gameType);
 
   try {
+    const token = await getAuthToken();
     const res = await fetch(url.toString(), {
       cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     const text = await res.text();
     if (!text.trim()) {
