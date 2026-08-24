@@ -58,3 +58,25 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
 }
+
+/* Triple Chance live-result cells: kill native button focus/Space outline (black on Windows) */
+.tc-bet-cell {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tc-bet-cell::-moz-focus-inner {
+  border: 0;
+}
+.tc-bet-cell:focus,
+.tc-bet-cell:focus-visible,
+.tc-bet-cell:active {
+  outline: none !important;
+  box-shadow: none;
+}
+.tc-bet-cell.is-selected,
+.tc-bet-cell.is-selected:focus,
+.tc-bet-cell.is-selected:focus-visible,
+.tc-bet-cell.is-selected:active {
+  border-color: #3b82f6 !important;
+}

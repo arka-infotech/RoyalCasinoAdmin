@@ -52,11 +52,11 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       />
 
       <div
-        className={`pt-20 min-h-screen flex flex-col transition-[margin] duration-300 ml-0 ${
+        className={`pt-20 min-h-screen flex min-w-0 flex-col transition-[margin] duration-300 ml-0 ${
           desktopOpen ? "md:ml-72" : "md:ml-16"
         }`}
       >
-        <div className="flex-1 p-4 md:p-6">{children}</div>
+        <div className="min-w-0 flex-1 overflow-x-hidden p-2 sm:p-4 md:p-6">{children}</div>
         <Footer />
       </div>
     </main>

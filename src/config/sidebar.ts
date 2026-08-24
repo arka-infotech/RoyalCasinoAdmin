@@ -38,6 +38,8 @@ export const sidebarSections: MenuSection[] = [
     items: [
       { title: 'Lucky 12', href: '/live-reports/live-result/lucky-12' },
       { title: 'Lucky 16', href: '/live-reports/live-result/lucky-16' },
+      { title: 'Triple Chance', href: '/live-reports/live-result/triple-chance' },
+      { title: 'Spin To Win', href: '/live-reports/live-result/spin-to-win' },
     ],
   },
   {
@@ -51,6 +53,8 @@ const ADMIN_ONLY = [
   '/game/game-history',
   '/live-reports/live-result/lucky-12',
   '/live-reports/live-result/lucky-16',
+  '/live-reports/live-result/triple-chance',
+  '/live-reports/live-result/spin-to-win',
   '/logs-activity/logs',
   '/reports/admin-commission-report',
 ];

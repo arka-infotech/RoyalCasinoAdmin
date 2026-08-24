@@ -16,6 +16,20 @@ export const LUCKY_GAME_TYPE: Record<LuckyGameVariant, string> = {
   "16": "LUCKY_CARD_16",
 };
 
+export const TRIPLE_CHANCE_GAME_TYPE = "TRIPLE_CHANCE";
+
+export const SPIN_TO_WIN_GAME_TYPE = "SPIN_TO_WIN";
+
+/** Spin To Win individual payout (matches backend game.config.ts). */
+export const SPIN_TO_WIN_PAYOUT = 9;
+
+/** Triple Chance payout multipliers (matches backend game.config.ts). */
+export const TRIPLE_CHANCE_PAYOUT = {
+  single: 9,
+  double: 90,
+  triple: 900,
+} as const;
+
 // Backend letter codes don't match the obvious guess — confirmed against the
 // player client's own mapping (Lucky12_Manager.cs / Lucky16_Manager.cs): 'c' is
 // Diamond and 'f' is Club.
@@ -157,8 +171,15 @@ export type LuckyGameStatusOk = {
   reward: string;
   /** Sum of amounts per `bet_details` key for all players in the current round */
   bet_totals_by_key?: Record<string, number>;
-  /** Sum of each player’s `total_bet` for the round (table collection) */
+  /** Unique players with a positive stake on each bet key */
+  bet_users_by_key?: Record<string, number>;
+  /** Pre-bet (Redis draft) amounts — also folded into bet_totals_by_key for Spin/Triple */
+  draft_totals_by_key?: Record<string, number>;
+  draft_users_by_key?: Record<string, number>;
+  /** Sum of each player’s `total_bet` for the round (table collection, placed only) */
   round_stake_total?: number;
+  /** Placed + draft stake (live expected collection while betting is open) */
+  live_stake_total?: number;
   bet_limits?: { min_per_play: number; max_per_play: number };
   game_round?: GameRoundSnapshot | null;
   daily_pot?: DailyPotSnapshot | null;
@@ -241,11 +262,10 @@ type ResPayload = {
  * Real-time admin status via Socket.IO `ADMIN_LUCKY_STATUS` (open subscribe).
  * Uses NEXT_PUBLIC_LUCKY_GAME_SERVER_URL (browser → game server).
  */
-export function useLuckyAdminLiveSocket(
-  variant: LuckyGameVariant,
+export function useLiveResultAdminSocket(
+  gameType: string,
   onStatus: (data: LuckyGameStatusOk) => void,
 ): { connected: boolean; error: string | null } {
-  const gameType = LUCKY_GAME_TYPE[variant];
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
   const [connected, setConnected] = useState(false);
@@ -316,6 +336,13 @@ export function useLuckyAdminLiveSocket(
   }, [gameType]);
 
   return { connected, error };
+}
+
+export function useLuckyAdminLiveSocket(
+  variant: LuckyGameVariant,
+  onStatus: (data: LuckyGameStatusOk) => void,
+): { connected: boolean; error: string | null } {
+  return useLiveResultAdminSocket(LUCKY_GAME_TYPE[variant], onStatus);
 }
 
 export type AdminGameHistoryRow = {
@@ -459,10 +486,9 @@ export function formatAdminMoney(n: number | null | undefined): string {
   });
 }
 
-export async function fetchLuckyGameStatus(
-  variant: LuckyGameVariant,
+export async function fetchLiveResultStatus(
+  gameType: string,
 ): Promise<LuckyGameStatusOk | { ok: false; error?: string }> {
-  const gameType = LUCKY_GAME_TYPE[variant];
   let res: Response;
   try {
     res = await fetch(
@@ -498,6 +524,12 @@ export async function fetchLuckyGameStatus(
       error: `Invalid JSON from admin status API (${res.status}, ${text.slice(0, 80)}…)`,
     };
   }
+}
+
+export async function fetchLuckyGameStatus(
+  variant: LuckyGameVariant,
+): Promise<LuckyGameStatusOk | { ok: false; error?: string }> {
+  return fetchLiveResultStatus(LUCKY_GAME_TYPE[variant]);
 }
 
 export async function postManualLuckyResult(body: {
@@ -598,4 +630,168 @@ export async function postResetLuckyBalance(body: {
   } catch {
     return { ok: false, error: "Invalid JSON from reset-balance API" };
   }
+}
+
+export async function postAddLiveBalance(body: {
+  gameType: string;
+  amount: number;
+}): Promise<{ ok: true; game_balance?: number } | { ok: false; error?: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/lucky-game/add-balance`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Network error adding balance",
+    };
+  }
+
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    return { ok: false, error: "Failed to read add-balance response body" };
+  }
+
+  if (!text.trim()) {
+    return { ok: false, error: `Empty response from admin API (${res.status})` };
+  }
+
+  try {
+    return JSON.parse(text) as
+      | { ok: true; game_balance?: number }
+      | { ok: false; error?: string };
+  } catch {
+    return { ok: false, error: "Invalid JSON from add-balance API" };
+  }
+}
+
+/** Format Triple Chance history entry for the Live Result list (`H-T-U | reward`). */
+export function formatTripleChanceHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return `${cardPart} | ${reward}`;
+}
+
+/** Expected payout if `winCard` (H-T-U) is declared for the current round. */
+export function calcTripleChanceExpectedPayment(
+  totals: Record<string, number> | undefined,
+  winCard: string,
+  reward: number = 1,
+): number {
+  if (!totals || !winCard) return 0;
+  const r = Number.isFinite(reward) && reward > 0 ? reward : 1;
+  const parts = winCard.split("-");
+  if (parts.length !== 3) return 0;
+  const units = parts[2] ?? "";
+  const doubleWin = `${parts[1]}-${parts[2]}`;
+
+  let total = 0;
+  for (const [key, raw] of Object.entries(totals)) {
+    const amt = Number(raw) || 0;
+    if (!amt) continue;
+    if (/^\d-\d-\d$/.test(key) && key === winCard) {
+      total += amt * TRIPLE_CHANCE_PAYOUT.triple;
+    } else if (/^\d-\d$/.test(key) && key === doubleWin) {
+      total += amt * TRIPLE_CHANCE_PAYOUT.double;
+    } else if (/^\d$/.test(key) && key === units) {
+      total += amt * TRIPLE_CHANCE_PAYOUT.single;
+    }
+  }
+  return Math.round((total * r + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Display stake on a Triple Chance admin cell `H-T-U`.
+ * Combines exact triple + matching double (`T-U`) + matching single (`U`)
+ * so all pre-bets show in the same 000–999 grid.
+ */
+export function tripleChanceCellDisplayStake(
+  totals: Record<string, number> | undefined,
+  card: string,
+): number {
+  if (!totals || !card) return 0;
+  const parts = card.split("-");
+  if (parts.length !== 3) return Number(totals[card]) || 0;
+  const [, t, u] = parts;
+  const triple = Number(totals[card]) || 0;
+  const double = Number(totals[`${t}-${u}`]) || 0;
+  const single = Number(totals[u ?? ""]) || 0;
+  return triple + double + single;
+}
+
+/** Split live totals into single / double / triple maps. */
+export function splitTripleChanceBetTotals(totals: Record<string, number> | undefined): {
+  singles: Record<string, number>;
+  doubles: Record<string, number>;
+  triples: Record<string, number>;
+} {
+  const singles: Record<string, number> = {};
+  const doubles: Record<string, number> = {};
+  const triples: Record<string, number> = {};
+  if (!totals) return { singles, doubles, triples };
+  for (const [key, raw] of Object.entries(totals)) {
+    const amt = Number(raw) || 0;
+    if (!amt) continue;
+    if (/^\d$/.test(key)) singles[key] = (singles[key] ?? 0) + amt;
+    else if (/^\d-\d$/.test(key)) doubles[key] = (doubles[key] ?? 0) + amt;
+    else if (/^\d-\d-\d$/.test(key)) triples[key] = (triples[key] ?? 0) + amt;
+  }
+  return { singles, doubles, triples };
+}
+
+/** Convert 0–999 (or "043") into backend win card `H-T-U`. */
+export function digitsToTripleWinCard(raw: string): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isInteger(n) || n < 0 || n > 999) return null;
+  const padded = String(n).padStart(3, "0");
+  return `${padded[0]}-${padded[1]}-${padded[2]}`;
+}
+
+export function tripleWinCardToDigits(winCard: string): string {
+  const parts = winCard.split("-");
+  if (parts.length !== 3) return "";
+  return `${parts[0]}${parts[1]}${parts[2]}`;
+}
+
+/** Format Spin To Win history for Live Result (`N | RX`). */
+export function formatSpinToWinHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
+/** Expected payout if digit `winCard` wins for the current round. */
+export function calcSpinToWinExpectedPayment(
+  totals: Record<string, number> | undefined,
+  winCard: string,
+  reward: number = 1,
+): number {
+  if (!totals || !winCard) return 0;
+  const r = Number.isFinite(reward) && reward > 0 ? reward : 1;
+  const stake = Number(totals[winCard]) || 0;
+  if (!stake) return 0;
+  return Math.round((stake * SPIN_TO_WIN_PAYOUT * r + Number.EPSILON) * 100) / 100;
+}
+
+export function isSpinToWinDigit(raw: string): boolean {
+  return /^[0-9]$/.test(String(raw ?? "").trim());
 }
