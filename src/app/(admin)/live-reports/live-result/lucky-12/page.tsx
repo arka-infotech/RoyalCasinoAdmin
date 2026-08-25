@@ -2,6 +2,7 @@
 
 import Image, { type StaticImageData } from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import allclubs from "@/assets/lucky12/allclubs.png";
 import allDiamonds from "@/assets/lucky12/allDiamonds.png";
@@ -221,6 +222,7 @@ function MiniResultCard({
 }
 
 export default function Lucky12Page() {
+  useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [multiplier, setMultiplier] = useState<string>("1");
   const [live, setLive] = useState<LuckyGameStatusOk | null>(null);

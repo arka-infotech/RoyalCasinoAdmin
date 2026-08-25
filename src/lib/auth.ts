@@ -37,4 +37,19 @@ export function getAdminFromRequest(req: NextRequest): AdminTokenPayload | null 
   return verifyToken(token);
 }
 
+/**
+ * Verifies the caller is logged in AND has the `admin` role. Use at the top of any
+ * API route restricted to admin-only sections (Game, Live Reports, Logs Activity) —
+ * the middleware only checks that a panel session exists, not which role it is.
+ * Returns the admin payload on success, or a ready-to-return 401/403 NextResponse.
+ */
+export async function requireAdminRole(): Promise<
+  { ok: true; admin: AdminTokenPayload } | { ok: false; status: 401 | 403; error: string }
+> {
+  const admin = await getAdminFromCookies();
+  if (!admin) return { ok: false, status: 401, error: 'Unauthorized' };
+  if (admin.role !== 'admin') return { ok: false, status: 403, error: 'Admin access required' };
+  return { ok: true, admin };
+}
+
 export { COOKIE_NAME };

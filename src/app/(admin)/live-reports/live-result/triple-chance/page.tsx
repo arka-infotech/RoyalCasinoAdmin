@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
   calcTripleChanceExpectedPayment,
@@ -52,6 +53,7 @@ function cn(...parts: Array<string | false | null | undefined>) {
 }
 
 export default function TripleChanceLiveResultPage() {
+  useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
   const [balanceInput, setBalanceInput] = useState<string>("");

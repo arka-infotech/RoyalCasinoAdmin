@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
   calcSpinToWinExpectedPayment,
@@ -35,6 +36,7 @@ function formatStake(n: number): string {
 }
 
 export default function SpinToWinLiveResultPage() {
+  useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
   const [multiplier, setMultiplier] = useState<string>("1");

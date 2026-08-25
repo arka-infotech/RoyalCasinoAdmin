@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
   ANDAR_BAHAR_EXACT_RANK_KEYS,
@@ -33,6 +34,7 @@ function formatStake(n: number): string {
 }
 
 export default function AndarBaharLiveResultPage() {
+  useRequireAdmin();
   const [previewSide, setPreviewSide] = useState<"andar" | "bahar" | "">("");
   const [balanceInput, setBalanceInput] = useState<string>("");
   const [live, setLive] = useState<LuckyGameStatusOk | null>(null);

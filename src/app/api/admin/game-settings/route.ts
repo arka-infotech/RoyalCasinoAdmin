@@ -1,13 +1,22 @@
-import { NextRequest } from 'next/server';
-import { getAdminFromCookies } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAdminFromCookies, requireAdminRole } from '@/lib/auth';
 import { proxyToBackend } from '@/lib/backendProxy';
 import { writeActivityLog } from '@/lib/activityLog';
 
 export async function GET() {
+  const guard = await requireAdminRole();
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+  }
   return proxyToBackend('/api/admin/game-settings');
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await requireAdminRole();
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+  }
+
   const body = (await req.json()) as {
     updates?: Array<{ gameId: string; winRatePct: number }>;
   };

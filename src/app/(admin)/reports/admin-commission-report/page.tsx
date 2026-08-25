@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAdminCommissionReport } from "@/hooks/useGames";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import { SortableTh } from "@/components/admin/SortableTh";
@@ -90,12 +89,7 @@ const quickRanges: Array<{ key: QuickRangeKey; label: string }> = [
 ];
 
 export default function AdminCommissionReportPage() {
-  const { user } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (user && user.role !== "admin") router.replace("/dashboard");
-  }, [user, router]);
+  useRequireAdmin();
 
   const [selectedRange, setSelectedRange] = useState<QuickRangeKey>("today");
   const [fromDate, setFromDate] = useState<string>(() => toISODateInputValue(new Date()));

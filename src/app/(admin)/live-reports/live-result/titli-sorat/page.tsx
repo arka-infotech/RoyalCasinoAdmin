@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
   calcTitliSoratExpectedPayment,
@@ -33,6 +34,7 @@ function formatStake(n: number): string {
 }
 
 export default function TitliSoratLiveResultPage() {
+  useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [multiplier, setMultiplier] = useState<string>("1");
   const [balanceInput, setBalanceInput] = useState<string>("");

@@ -6,6 +6,7 @@ import {
   useAdminGameHistorySocket,
   type AdminGameHistoryRow,
 } from "@/lib/luckyGameAdmin";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 type GameTypeFilter = "ALL" | "LUCKY_CARD_12" | "LUCKY_CARD_16";
 
@@ -28,6 +29,7 @@ function statusBadgeClass(status: AdminGameHistoryRow["status"]): string {
 }
 
 export default function GameHistoryPage() {
+  useRequireAdmin();
   const [fromDate, setFromDate] = useState(todayIsoDate());
   const [toDate, setToDate] = useState(todayIsoDate());
   const [gameType, setGameType] = useState<GameTypeFilter>("ALL");

@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 type GameSettingRow = {
   gameId: string;
@@ -16,16 +15,11 @@ type GameSettingRow = {
 type WinState = Record<string, string>;
 
 export default function WinPercentagePage() {
-  const { user } = useAuth();
-  const router = useRouter();
+  useRequireAdmin();
   const [rows, setRows] = useState<GameSettingRow[]>([]);
   const [values, setValues] = useState<WinState>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (user && user.role !== "admin") router.replace("/dashboard");
-  }, [user, router]);
 
   useEffect(() => {
     let mounted = true;

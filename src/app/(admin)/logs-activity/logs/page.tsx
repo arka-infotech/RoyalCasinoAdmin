@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLogs } from "@/hooks/useGames";
 import { useStableReportTotal } from "@/hooks/useStableReportTotal";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import { SortableTh } from "@/components/admin/SortableTh";
@@ -38,6 +39,7 @@ const METHOD_COLORS: Record<string, string> = {
 };
 
 export default function LogsPage() {
+  useRequireAdmin();
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [entriesPerPage, setEntriesPerPage] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);

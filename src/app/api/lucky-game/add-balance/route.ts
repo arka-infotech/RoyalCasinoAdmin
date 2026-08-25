@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
-import { getAdminFromCookies } from "@/lib/auth";
+import { getAdminFromCookies, requireAdminRole } from "@/lib/auth";
 import { writeActivityLog } from "@/lib/activityLog";
 import { getAuthToken } from "@/lib/backendProxy";
 
@@ -19,6 +19,11 @@ function gameServerBasePath() {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = await requireAdminRole();
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+  }
+
   const base = resolveBaseUrl();
   if (!base) {
     return NextResponse.json(

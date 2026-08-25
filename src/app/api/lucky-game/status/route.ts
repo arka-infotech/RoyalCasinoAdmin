@@ -3,8 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
 import { getAuthToken } from "@/lib/backendProxy";
+import { requireAdminRole } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
+  const guard = await requireAdminRole();
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+  }
+
   const gameType = request.nextUrl.searchParams.get("gameType");
   const base = normalizeGameServerBaseUrl(
     process.env.LUCKY_GAME_SERVER_URL ??
