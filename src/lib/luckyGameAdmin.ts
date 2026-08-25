@@ -795,3 +795,161 @@ export function calcSpinToWinExpectedPayment(
 export function isSpinToWinDigit(raw: string): boolean {
   return /^[0-9]$/.test(String(raw ?? "").trim());
 }
+
+export const ANDAR_BAHAR_GAME_TYPE = "ANDAR_BAHAR";
+
+export const FUN_TARGET_GAME_TYPE = "SINGLE_CHANCE_3D";
+
+export const TITLI_SORAT_GAME_TYPE = "LUCKY_SORAT";
+
+/** Fun Target individual payout (matches backend game.config.ts). */
+export const FUN_TARGET_PAYOUT = 9;
+
+/** Titli Sorat individual payout (matches backend game.config.ts). */
+export const TITLI_SORAT_PAYOUT = 11;
+
+/**
+ * Andar Bahar payout multipliers (matches backend game.config.ts).
+ * Unlike Triple Chance's single/double/triple scheme, each bet family here
+ * has its own independent multiplier.
+ */
+export const ANDAR_BAHAR_PAYOUT = {
+  andar: 1.9,
+  bahar: 2.0,
+  suit: 4.0,
+  rangeLow: 2.0,
+  rangeMiddle: 12.0,
+  rangeHigh: 2.0,
+  exactRank: 12.0,
+} as const;
+
+/** Must match Unity Sorat.unity AllBox_LIST GameObject names exactly (backend TITLI_SORAT_SYMBOLS). */
+export const TITLI_SORAT_SYMBOLS = [
+  "Amrela",
+  "Ball",
+  "Sun",
+  "Lamp",
+  "Cow",
+  "WatterDoll",
+  "Kite",
+  "Gariyo",
+  "Rose",
+  "Butterfly",
+  "Egle",
+  "Rebit",
+] as const;
+
+export type TitliSoratSymbol = (typeof TITLI_SORAT_SYMBOLS)[number];
+
+/** Andar Bahar main-outcome keys (backend `andar-bahar.engine.ts` cellMultiplier). */
+export const ANDAR_BAHAR_MAIN_KEYS = { andar: "Under", bahar: "Bahar" } as const;
+
+/** Suit side-bet keys → suit letter (matches backend `suitMap` in game.config.ts). */
+export const ANDAR_BAHAR_SUIT_KEYS: Array<{ key: string; label: string }> = [
+  { key: "1Card", label: "Hearts" },
+  { key: "2Card", label: "Clubs" },
+  { key: "3Card", label: "Spades" },
+  { key: "4Card", label: "Diamonds" },
+];
+
+/** Rank-range side-bet keys (matches backend `cellMultiplier`: A-6 low, 7 middle, 8-K high). */
+export const ANDAR_BAHAR_RANGE_KEYS: Array<{ key: string; label: string }> = [
+  { key: "A_To_6", label: "A to 6" },
+  { key: "7", label: "7" },
+  { key: "8_To_K", label: "8 to K" },
+];
+
+/** Exact-rank side-bet keys '1'..'13' (Ace..King), matches backend `cellMultiplier`. */
+export const ANDAR_BAHAR_EXACT_RANK_KEYS: Array<{ key: string; label: string }> = [
+  { key: "1", label: "A" },
+  { key: "2", label: "2" },
+  { key: "3", label: "3" },
+  { key: "4", label: "4" },
+  { key: "5", label: "5" },
+  { key: "6", label: "6" },
+  { key: "7", label: "7" },
+  { key: "8", label: "8" },
+  { key: "9", label: "9" },
+  { key: "10", label: "10" },
+  { key: "11", label: "J" },
+  { key: "12", label: "Q" },
+  { key: "13", label: "K" },
+];
+
+/**
+ * Expected payout if `winningSide` ('andar' | 'bahar') is declared for the current round.
+ * Andar Bahar's manual-result support does not exist on the backend (card-matching
+ * mechanic, not a pick-a-winner one) — this is provided only for a live "what if" preview,
+ * not for driving a save action.
+ */
+export function calcAndarBaharExpectedPayment(
+  totals: Record<string, number> | undefined,
+  winningSide: "andar" | "bahar",
+): number {
+  if (!totals) return 0;
+  const mainKey = winningSide === "andar" ? ANDAR_BAHAR_MAIN_KEYS.andar : ANDAR_BAHAR_MAIN_KEYS.bahar;
+  const mult = winningSide === "andar" ? ANDAR_BAHAR_PAYOUT.andar : ANDAR_BAHAR_PAYOUT.bahar;
+  const stake = Number(totals[mainKey]) || 0;
+  return Math.round((stake * mult + Number.EPSILON) * 100) / 100;
+}
+
+/** Format Andar Bahar history entry (`<suit>-<rank>|reward`, e.g. `l-7|0`) for the Live Result list. */
+export function formatAndarBaharHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== "" ? String(rewardRaw).trim() : "0";
+  return `${cardPart} | ${reward}`;
+}
+
+/** Format Fun Target history entry (`<digit>|<rewardX>`) for the Live Result list. */
+export function formatFunTargetHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== "" ? String(rewardRaw).trim() : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
+/** Format Titli Sorat history entry (`<symbol>|<rewardX>`) for the Live Result list. */
+export function formatTitliSoratHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== "" ? String(rewardRaw).trim() : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
+/** Expected payout if digit `winCard` wins for the current round (Fun Target, flat 9x). */
+export function calcFunTargetExpectedPayment(
+  totals: Record<string, number> | undefined,
+  winCard: string,
+  reward: number = 1,
+): number {
+  if (!totals || !winCard) return 0;
+  const r = Number.isFinite(reward) && reward > 0 ? reward : 1;
+  const stake = Number(totals[winCard]) || 0;
+  if (!stake) return 0;
+  return Math.round((stake * FUN_TARGET_PAYOUT * r + Number.EPSILON) * 100) / 100;
+}
+
+/** Expected payout if symbol `winCard` wins for the current round (Titli Sorat, flat 11x). */
+export function calcTitliSoratExpectedPayment(
+  totals: Record<string, number> | undefined,
+  winCard: string,
+  reward: number = 1,
+): number {
+  if (!totals || !winCard) return 0;
+  const r = Number.isFinite(reward) && reward > 0 ? reward : 1;
+  const stake = Number(totals[winCard]) || 0;
+  if (!stake) return 0;
+  return Math.round((stake * TITLI_SORAT_PAYOUT * r + Number.EPSILON) * 100) / 100;
+}
+
+export function isFunTargetDigit(raw: string): boolean {
+  return /^[0-9]$/.test(String(raw ?? "").trim());
+}
+
+export function isTitliSoratSymbol(raw: string): raw is TitliSoratSymbol {
+  return (TITLI_SORAT_SYMBOLS as readonly string[]).includes(String(raw ?? "").trim());
+}

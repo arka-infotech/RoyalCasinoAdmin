@@ -40,6 +40,9 @@ export const sidebarSections: MenuSection[] = [
       { title: 'Lucky 16', href: '/live-reports/live-result/lucky-16' },
       { title: 'Triple Chance', href: '/live-reports/live-result/triple-chance' },
       { title: 'Spin To Win', href: '/live-reports/live-result/spin-to-win' },
+      { title: 'Andar Bahar', href: '/live-reports/live-result/andar-bahar' },
+      { title: 'Fun Target', href: '/live-reports/live-result/fun-target' },
+      { title: 'Titli Sorat', href: '/live-reports/live-result/titli-sorat' },
     ],
   },
   {
@@ -55,6 +58,9 @@ const ADMIN_ONLY = [
   '/live-reports/live-result/lucky-16',
   '/live-reports/live-result/triple-chance',
   '/live-reports/live-result/spin-to-win',
+  '/live-reports/live-result/andar-bahar',
+  '/live-reports/live-result/fun-target',
+  '/live-reports/live-result/titli-sorat',
   '/logs-activity/logs',
   '/reports/admin-commission-report',
 ];
