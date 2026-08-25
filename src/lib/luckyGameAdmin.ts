@@ -20,8 +20,24 @@ export const TRIPLE_CHANCE_GAME_TYPE = "TRIPLE_CHANCE";
 
 export const SPIN_TO_WIN_GAME_TYPE = "SPIN_TO_WIN";
 
+export const ROULETTE_MINI_GAME_TYPE = "ROULETTE_MINI";
+
 /** Spin To Win individual payout (matches backend game.config.ts). */
 export const SPIN_TO_WIN_PAYOUT = 9;
+
+export {
+  ROULETTE_MINI_STRAIGHT_PAYOUT,
+  ROULETTE_MINI_RED,
+  isRouletteMiniNumber,
+  rouletteMiniPocketTone,
+  calcRouletteMiniExpectedPayment,
+  formatRouletteMiniHistoryEntry,
+  rouletteMiniPocketExposure,
+  listRouletteMiniSpecialStakes,
+  countRouletteMiniUsersWinning,
+  resolveRouletteMiniBetKey,
+} from "@/lib/rouletteMiniLive";
+export type { RouletteMiniStakeRow, RouletteMiniBetKind } from "@/lib/rouletteMiniLive";
 
 /** Triple Chance payout multipliers (matches backend game.config.ts). */
 export const TRIPLE_CHANCE_PAYOUT = {
@@ -173,6 +189,8 @@ export type LuckyGameStatusOk = {
   bet_totals_by_key?: Record<string, number>;
   /** Unique players with a positive stake on each bet key */
   bet_users_by_key?: Record<string, number>;
+  /** User ids per bet key (for accurate “users winning” across multi-number bets) */
+  bet_user_ids_by_key?: Record<string, string[]>;
   /** Pre-bet (Redis draft) amounts — also folded into bet_totals_by_key for Spin/Triple */
   draft_totals_by_key?: Record<string, number>;
   draft_users_by_key?: Record<string, number>;
@@ -203,6 +221,7 @@ export function getManualSaveButtonTitle(
 }
 
 export function getLuckyTimerLabel(live: LuckyGameStatusOk | null): string {
+  if (live?.phase === "done") return "finish_state";
   if (live?.game_state === "start_spin") return "start_spin";
   if (
     live?.phase === "init" ||
@@ -817,6 +836,7 @@ export const ANDAR_BAHAR_PAYOUT = {
   andar: 1.9,
   bahar: 2.0,
   suit: 4.0,
+  color: 2.0,
   rangeLow: 2.0,
   rangeMiddle: 12.0,
   rangeHigh: 2.0,
@@ -844,13 +864,22 @@ export type TitliSoratSymbol = (typeof TITLI_SORAT_SYMBOLS)[number];
 /** Andar Bahar main-outcome keys (backend `andar-bahar.engine.ts` cellMultiplier). */
 export const ANDAR_BAHAR_MAIN_KEYS = { andar: "Under", bahar: "Bahar" } as const;
 
-/** Suit side-bet keys → suit letter (matches backend `suitMap` in game.config.ts). */
+/**
+ * Suit side-bet keys — Unity UndeBahar AllBox_LIST GameObject names (`l`/`f`/`k`/`c`).
+ * Parent containers are named `1Card`..`4Card` but those are NOT the bet keys.
+ */
 export const ANDAR_BAHAR_SUIT_KEYS: Array<{ key: string; label: string }> = [
-  { key: "1Card", label: "Hearts" },
-  { key: "2Card", label: "Clubs" },
-  { key: "3Card", label: "Spades" },
-  { key: "4Card", label: "Diamonds" },
+  { key: "l", label: "Hearts" },
+  { key: "f", label: "Clubs" },
+  { key: "k", label: "Spades" },
+  { key: "c", label: "Diamonds" },
 ];
+
+/** Unity color-pair keys (ColorIcons panel): red ♦♥ / black ♣♠. */
+export const ANDAR_BAHAR_COLOR_PAIR_KEYS = {
+  red: "cl",
+  black: "fk",
+} as const;
 
 /** Rank-range side-bet keys (matches backend `cellMultiplier`: A-6 low, 7 middle, 8-K high). */
 export const ANDAR_BAHAR_RANGE_KEYS: Array<{ key: string; label: string }> = [
@@ -877,24 +906,176 @@ export const ANDAR_BAHAR_EXACT_RANK_KEYS: Array<{ key: string; label: string }> 
 ];
 
 /**
- * Expected payout if `winningSide` ('andar' | 'bahar') is declared for the current round.
- * Andar Bahar's manual-result support does not exist on the backend (card-matching
- * mechanic, not a pick-a-winner one) — this is provided only for a live "what if" preview,
- * not for driving a save action.
+ * ONLY NUMBERS cell stake: exact rank + matching range bet.
+ * - 1..6 ← `A_To_6`
+ * - 7    ← key `7` (Unity already merges exact + range-middle)
+ * - 8..13 ← `8_To_K`
+ */
+export function andarBaharRankDisplayStake(
+  totals: Record<string, number> | undefined,
+  rankKey: string,
+): number {
+  if (!totals) return 0;
+  const exact = Number(totals[rankKey]) || 0;
+  const rank = Number.parseInt(rankKey, 10);
+  if (!Number.isFinite(rank)) return exact;
+  if (rank >= 1 && rank <= 6) return exact + (Number(totals.A_To_6) || 0);
+  if (rank >= 8 && rank <= 13) return exact + (Number(totals["8_To_K"]) || 0);
+  return exact;
+}
+
+/**
+ * COLOR'S cell stake: single suit + matching color-pair.
+ * - Hearts (`l`) / Diamonds (`c`) ← `cl` (red)
+ * - Clubs (`f`) / Spades (`k`) ← `fk` (black)
+ */
+export function andarBaharSuitDisplayStake(
+  totals: Record<string, number> | undefined,
+  suitKey: string,
+): number {
+  if (!totals) return 0;
+  const suit = Number(totals[suitKey]) || 0;
+  if (suitKey === "l" || suitKey === "c") {
+    return suit + (Number(totals[ANDAR_BAHAR_COLOR_PAIR_KEYS.red]) || 0);
+  }
+  if (suitKey === "f" || suitKey === "k") {
+    return suit + (Number(totals[ANDAR_BAHAR_COLOR_PAIR_KEYS.black]) || 0);
+  }
+  return suit;
+}
+
+/**
+ * Expected payout for the admin selection.
+ * - Side only → Under/Bahar main bets
+ * - Joker card (`k-7`) → exact rank, suit, color-pair (`cl`/`fk`), and range bets
  */
 export function calcAndarBaharExpectedPayment(
   totals: Record<string, number> | undefined,
-  winningSide: "andar" | "bahar",
+  winningSide?: "andar" | "bahar" | "",
+  jokerCard?: string | null,
 ): number {
   if (!totals) return 0;
-  const mainKey = winningSide === "andar" ? ANDAR_BAHAR_MAIN_KEYS.andar : ANDAR_BAHAR_MAIN_KEYS.bahar;
-  const mult = winningSide === "andar" ? ANDAR_BAHAR_PAYOUT.andar : ANDAR_BAHAR_PAYOUT.bahar;
-  const stake = Number(totals[mainKey]) || 0;
-  return Math.round((stake * mult + Number.EPSILON) * 100) / 100;
+  let total = 0;
+
+  if (winningSide === "andar" || winningSide === "bahar") {
+    const mainKey =
+      winningSide === "andar" ? ANDAR_BAHAR_MAIN_KEYS.andar : ANDAR_BAHAR_MAIN_KEYS.bahar;
+    const mult = winningSide === "andar" ? ANDAR_BAHAR_PAYOUT.andar : ANDAR_BAHAR_PAYOUT.bahar;
+    total += (Number(totals[mainKey]) || 0) * mult;
+  }
+
+  const joker = String(jokerCard ?? "").trim();
+  if (/^[cfkl]-(?:[1-9]|1[0-3])$/.test(joker)) {
+    const [suit, rankStr] = joker.split("-");
+    const rank = Number(rankStr);
+
+    // Exact rank (Unity key "7" also covers range-middle — same 12x, count once)
+    total += (Number(totals[rankStr!]) || 0) * ANDAR_BAHAR_PAYOUT.exactRank;
+
+    // Single suit
+    total += (Number(totals[suit!]) || 0) * ANDAR_BAHAR_PAYOUT.suit;
+
+    // Color pair: cl = ♦♥, fk = ♣♠
+    if (suit === "c" || suit === "l") {
+      total += (Number(totals[ANDAR_BAHAR_COLOR_PAIR_KEYS.red]) || 0) * ANDAR_BAHAR_PAYOUT.color;
+    } else if (suit === "f" || suit === "k") {
+      total += (Number(totals[ANDAR_BAHAR_COLOR_PAIR_KEYS.black]) || 0) * ANDAR_BAHAR_PAYOUT.color;
+    }
+
+    if (rank >= 1 && rank <= 6) {
+      total += (Number(totals.A_To_6) || 0) * ANDAR_BAHAR_PAYOUT.rangeLow;
+    } else if (rank >= 8 && rank <= 13) {
+      total += (Number(totals["8_To_K"]) || 0) * ANDAR_BAHAR_PAYOUT.rangeHigh;
+    }
+  }
+
+  return Math.round((total + Number.EPSILON) * 100) / 100;
+}
+
+export function andarBaharSuitLabel(suitKey: string): string {
+  switch (suitKey) {
+    case "l":
+    case "1Card":
+      return "Hearts";
+    case "f":
+    case "2Card":
+      return "Clubs";
+    case "k":
+    case "3Card":
+      return "Spades";
+    case "c":
+    case "4Card":
+      return "Diamonds";
+    default:
+      return "";
+  }
+}
+
+/**
+ * Map suit side-bet key → backend suit letter.
+ * Accepts Unity letter keys and legacy `1Card`..`4Card` aliases.
+ */
+export const ANDAR_BAHAR_SUIT_LETTER: Record<string, "c" | "f" | "k" | "l"> = {
+  l: "l",
+  f: "f",
+  k: "k",
+  c: "c",
+  "1Card": "l",
+  "2Card": "f",
+  "3Card": "k",
+  "4Card": "c",
+};
+
+export function andarBaharRankLabel(rank: string): string {
+  switch (rank) {
+    case "1":
+      return "A";
+    case "11":
+      return "J";
+    case "12":
+      return "Q";
+    case "13":
+      return "K";
+    default:
+      return rank;
+  }
+}
+
+/** Build joker win card from suit key + rank (`k` + `7` → `k-7`). */
+export function andarBaharJokerFromSelection(
+  suitKey: string,
+  rank: string,
+): string | null {
+  const suit = ANDAR_BAHAR_SUIT_LETTER[suitKey];
+  if (!suit || !/^(?:[1-9]|1[0-3])$/.test(rank)) return null;
+  return `${suit}-${rank}`;
+}
+
+/** Format Andar Bahar history entry (`<suit>-<rank>|reward`) for display with sprites. */
+export function parseAndarBaharHistoryCard(entry: string): {
+  cardId: string;
+  rankLabel: string;
+  rewardLabel: string;
+} | null {
+  const [card, rewardRaw] = entry.split("|");
+  const cardId = (card ?? "").trim();
+  if (!/^[cfkl]-(?:[1-9]|1[0-3])$/.test(cardId)) return null;
+  const [, rank] = cardId.split("-");
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return {
+    cardId,
+    rankLabel: andarBaharRankLabel(rank ?? ""),
+    rewardLabel: `${reward}X`,
+  };
 }
 
 /** Format Andar Bahar history entry (`<suit>-<rank>|reward`, e.g. `l-7|0`) for the Live Result list. */
 export function formatAndarBaharHistoryEntry(entry: string): string {
+  const parsed = parseAndarBaharHistoryCard(entry);
+  if (parsed) return `${parsed.cardId} | ${parsed.rewardLabel}`;
   const [card, rewardRaw] = entry.split("|");
   const cardPart = (card ?? "").trim() || entry;
   const reward =

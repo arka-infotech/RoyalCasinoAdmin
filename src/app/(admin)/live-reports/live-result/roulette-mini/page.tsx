@@ -4,58 +4,56 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
-  calcTripleChanceExpectedPayment,
-  digitsToTripleWinCard,
+  calcRouletteMiniExpectedPayment,
+  countRouletteMiniUsersWinning,
   fetchLiveResultStatus,
   formatAdminMoney,
-  formatTripleChanceHistoryEntry,
+  formatRouletteMiniHistoryEntry,
   getLuckyTimerLabel,
   getManualSaveButtonTitle,
+  isRouletteMiniNumber,
   postAddLiveBalance,
   postManualLuckyResult,
   postResetLuckyBalance,
-  tripleChanceCellDisplayStake,
-  tripleWinCardToDigits,
-  TRIPLE_CHANCE_GAME_TYPE,
+  rouletteMiniPocketExposure,
+  rouletteMiniPocketTone,
+  ROULETTE_MINI_GAME_TYPE,
   useLiveResultAdminSocket,
   useLuckyLiveDisplaySeconds,
   type LuckyGameStatusOk,
 } from "@/lib/luckyGameAdmin";
 
-const GAME_TYPE = TRIPLE_CHANCE_GAME_TYPE;
+const GAME_TYPE = ROULETTE_MINI_GAME_TYPE;
 
-/** Precompute 10 groups of 100 outcomes: 000–099 … 900–999 */
-const HUNDRED_GROUPS: Array<{ label: string; cards: string[] }> = (() => {
-  const groups: Array<{ label: string; cards: string[] }> = [];
-  for (let h = 0; h <= 9; h++) {
-    const cards: string[] = [];
-    for (let t = 0; t <= 9; t++) {
-      for (let u = 0; u <= 9; u++) {
-        cards.push(`${h}-${t}-${u}`);
-      }
-    }
-    groups.push({
-      label: `${h}00-${h}99`,
-      cards,
-    });
-  }
-  return groups;
-})();
-
-function formatBetAmount(n: number): string {
-  if (!n) return "00";
-  if (Number.isInteger(n)) return String(n).padStart(2, "0");
-  return n.toFixed(2);
-}
+/** Rows match the reference Live Result screenshot: 0–9 / 10–19 / 20–29 / 30–36 */
+const BOARD_ROWS: number[][] = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+  [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+  [30, 31, 32, 33, 34, 35, 36],
+];
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-export default function TripleChanceLiveResultPage() {
+function formatStake(n: number): string {
+  if (!n) return "0";
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(2);
+}
+
+function pocketBoxClass(tone: "green" | "red" | "black"): string {
+  if (tone === "green") return "border-emerald-600 bg-emerald-500 text-white";
+  if (tone === "red") return "border-red-700 bg-red-600 text-white";
+  return "border-gray-800 bg-gray-900 text-white";
+}
+
+export default function RouletteMiniLiveResultPage() {
   useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
+  const [multiplier, setMultiplier] = useState<string>("1");
   const [balanceInput, setBalanceInput] = useState<string>("");
   const [live, setLive] = useState<LuckyGameStatusOk | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -63,7 +61,6 @@ export default function TripleChanceLiveResultPage() {
   const [resetBusy, setResetBusy] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const lastRoundIdRef = useRef<string | number | null>(null);
-  const selectedCellRef = useRef<HTMLButtonElement | null>(null);
 
   const refreshLive = useCallback(async () => {
     try {
@@ -93,36 +90,37 @@ export default function TripleChanceLiveResultPage() {
   useEffect(() => {
     const currentRoundId = live?.round_id ?? null;
     if (currentRoundId == null) return;
-
     if (lastRoundIdRef.current !== null && lastRoundIdRef.current !== currentRoundId) {
       setSelected("");
       setResultInput("");
+      setMultiplier("1");
     }
     lastRoundIdRef.current = currentRoundId;
   }, [live?.round_id]);
 
-  useEffect(() => {
-    if (selected) {
-      selectedCellRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [selected]);
-
   const displaySeconds = useLuckyLiveDisplaySeconds(live);
+  const canSelect = live?.phase === "betting";
 
-  const selectWinCard = useCallback((winCard: string) => {
-    setSelected(winCard);
-    setResultInput(tripleWinCardToDigits(winCard));
+  const selectNumber = useCallback((n: string) => {
+    if (!isRouletteMiniNumber(n)) return;
+    setSelected(n);
+    setResultInput(n);
   }, []);
 
   const payload = useMemo(() => {
     const timerLabel = getLuckyTimerLabel(live);
     const timerValue = displaySeconds;
     const totals = live?.bet_totals_by_key ?? {};
+    const usersByKey = live?.bet_users_by_key ?? {};
+    const userIdsByKey = live?.bet_user_ids_by_key;
     const previewCard = selected || live?.pending_manual?.win_card || "";
-    const rewardNum = Number(live?.pending_manual?.reward ?? live?.reward ?? 1);
+
     const totalExpectedPayment = previewCard
-      ? calcTripleChanceExpectedPayment(totals, previewCard, rewardNum)
+      ? calcRouletteMiniExpectedPayment(totals, previewCard)
       : null;
+    const totalUsersWinning = previewCard
+      ? countRouletteMiniUsersWinning(previewCard, totals, usersByKey, userIdsByKey)
+      : 0;
 
     const dp = live?.daily_pot;
     const liveCollection = dp?.collected_pot ?? null;
@@ -134,14 +132,16 @@ export default function TripleChanceLiveResultPage() {
         : Math.round((liveCollection - livePayment + Number.EPSILON) * 100) / 100;
 
     const recentResults = (live?.last_win_cards ?? [])
-      .slice(0, 12)
-      .map(formatTripleChanceHistoryEntry);
+      .slice(-5)
+      .reverse()
+      .map(formatRouletteMiniHistoryEntry);
 
     return {
       timerLabel,
       timerValue,
       totalExpectedCollection: live?.live_stake_total ?? live?.round_stake_total ?? 0,
       totalExpectedPayment,
+      totalUsersWinning,
       totals,
       dailySummaryRows: [
         { label: "TOTAL Game Balance:", value: formatAdminMoney(gameBalance) },
@@ -155,10 +155,9 @@ export default function TripleChanceLiveResultPage() {
 
   async function handleSave() {
     setSaveMsg(null);
-    const fromInput = digitsToTripleWinCard(resultInput);
-    const winCard = selected || fromInput;
+    const winCard = selected || (isRouletteMiniNumber(resultInput) ? String(Number(resultInput)) : "");
     if (!winCard) {
-      setSaveMsg("Select or enter a result (0–999)");
+      setSaveMsg("Select or enter a number (0–36)");
       return;
     }
     setSaveBusy(true);
@@ -166,7 +165,7 @@ export default function TripleChanceLiveResultPage() {
       const res = await postManualLuckyResult({
         gameType: GAME_TYPE,
         winCard,
-        reward: "1",
+        ...(multiplier.trim() ? { reward: multiplier.trim() } : {}),
         ...(live?.round_id ? { roundId: live.round_id } : {}),
       });
       if (res.ok) {
@@ -220,12 +219,10 @@ export default function TripleChanceLiveResultPage() {
     }
   }
 
-  const canSelect = live?.phase === "betting";
-
   return (
     <section className="w-full min-w-0 overflow-x-hidden rounded-xl border bg-white p-2 shadow-sm sm:p-3 md:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <h1 className="text-[14px] font-medium text-gray-900">Triple Chance</h1>
+        <h1 className="text-[14px] font-medium text-gray-900">Roulette Mini</h1>
         <button
           type="button"
           disabled={resetBusy}
@@ -236,72 +233,59 @@ export default function TripleChanceLiveResultPage() {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] xl:items-start xl:gap-5">
+      <div className="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(220px,320px)] xl:items-start xl:gap-6">
         <div className="order-2 min-w-0 xl:order-1">
-          <div className="mb-2 text-center text-[15px] font-semibold text-gray-900 sm:text-[18px]">
-            Bet Details
-          </div>
-          <div className="max-h-[min(62vh,780px)] space-y-3 overflow-auto overscroll-contain pr-0.5 sm:max-h-[min(70vh,860px)] sm:space-y-4">
-            {HUNDRED_GROUPS.map((group) => (
+          <div className="overflow-hidden rounded-[3px] border border-[#7BA3C9] bg-white">
+            {BOARD_ROWS.map((row, rowIdx) => (
               <div
-                key={group.label}
-                className="overflow-hidden rounded-[3px] border border-gray-200 bg-[#EBF1F5]"
+                key={rowIdx}
+                className={cn(
+                  "grid border-b border-[#7BA3C9] last:border-b-0",
+                  row.length === 10 ? "grid-cols-10" : "grid-cols-7",
+                )}
               >
-                <div className="sticky top-0 z-10 border-b border-gray-200/70 bg-[#EBF1F5] py-1.5 text-center text-[13px] font-semibold tracking-wide text-gray-800 sm:text-[15px]">
-                  {group.label}
-                </div>
-                <div className="grid w-full gap-0 border-t border-l border-gray-300 [grid-template-columns:repeat(auto-fill,minmax(2.7rem,1fr))] sm:[grid-template-columns:repeat(auto-fill,minmax(3.15rem,1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(3.35rem,1fr))]">
-                  {group.cards.map((card) => {
-                    const stake = tripleChanceCellDisplayStake(payload.totals, card);
-                    const isSelected = selected === card;
-                    return (
-                      <button
-                        key={card}
-                        type="button"
-                        ref={isSelected ? selectedCellRef : undefined}
-                        disabled={!canSelect}
-                        onClick={() => selectWinCard(card)}
-                        onKeyDown={(e) => {
-                          if (e.key === " " || e.key === "Spacebar") {
-                            e.preventDefault();
-                            if (canSelect) selectWinCard(card);
-                          }
-                        }}
+                {row.map((n) => {
+                  const key = String(n);
+                  const stake = rouletteMiniPocketExposure(payload.totals, n);
+                  const isSelected = selected === key;
+                  const tone = rouletteMiniPocketTone(n);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      disabled={!canSelect}
+                      onClick={() => selectNumber(key)}
+                      className={cn(
+                        "flex min-w-0 flex-col items-center border-r border-[#7BA3C9] px-1.5 py-2 last:border-r-0 sm:px-2 sm:py-2.5",
+                        "outline-none focus:outline-none focus-visible:outline-none",
+                        isSelected
+                          ? "bg-blue-100/90 ring-1 ring-inset ring-blue-500"
+                          : stake > 0
+                            ? "bg-orange-300/80"
+                            : "bg-white",
+                        !canSelect && "cursor-default",
+                      )}
+                      title={
+                        canSelect
+                          ? `Select ${n}${stake > 0 ? ` (exposure ${formatStake(stake)})` : ""}`
+                          : String(n)
+                      }
+                    >
+                      <span className="text-[13px] font-semibold tabular-nums text-gray-900 sm:text-[15px]">
+                        {n}
+                      </span>
+                      <span
                         className={cn(
-                          "tc-bet-cell flex min-w-0 flex-col items-center px-1.5 py-1.5 text-center sm:px-2 sm:py-2",
-                          "border-r border-b border-gray-300 outline-none ring-0",
-                          "focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none",
-                          isSelected
-                            ? "is-selected !border-blue-500 bg-blue-100/80 ring-1 ring-inset ring-blue-500"
-                            : stake > 0
-                              ? "bg-orange-300/80"
-                              : "bg-[#EBF1F5]",
-                          !canSelect && "cursor-default",
+                          "mt-1 flex h-[18px] min-w-[22px] items-center justify-center rounded-[2px] border px-1 text-[10px] font-semibold tabular-nums sm:h-[20px] sm:min-w-[26px] sm:text-[11px]",
+                          pocketBoxClass(tone),
+                          stake > 0 && "ring-1 ring-orange-400",
                         )}
-                        title={canSelect ? `Select ${card}` : card}
                       >
-                        <span
-                          className={cn(
-                            "max-w-full truncate px-0.5 text-[10px] font-semibold leading-tight text-gray-800 sm:text-[12px] md:text-[13px]",
-                            stake > 0 && !isSelected && "bg-orange-300",
-                          )}
-                        >
-                          {card}
-                        </span>
-                        <span
-                          className={cn(
-                            "mt-1 flex h-[14px] min-w-[18px] shrink-0 items-center justify-center rounded-[1px] border border-[#7BA3C9] px-0.5 text-[9px] leading-none tabular-nums sm:h-[17px] sm:min-w-[24px] sm:text-[11px]",
-                            stake > 0
-                              ? "bg-orange-300/80 text-gray-800"
-                              : "bg-white text-gray-500",
-                          )}
-                        >
-                          {formatBetAmount(stake)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {formatStake(stake)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -316,12 +300,33 @@ export default function TripleChanceLiveResultPage() {
               {payload.timerValue ?? "—"}
             </div>
             <div className="mt-2 space-y-0.5 break-words text-[11px] leading-snug text-gray-700 sm:text-[14px]">
-              <div>Total Expected Collection: {payload.totalExpectedCollection}</div>
+              <div>
+                Total Expected Collection:{" "}
+                {Number(payload.totalExpectedCollection).toFixed(2)}
+              </div>
               <div>
                 Total Expected Payment:
-                {payload.totalExpectedPayment == null ? "" : ` ${payload.totalExpectedPayment}`}
+                {payload.totalExpectedPayment == null
+                  ? ""
+                  : ` ${payload.totalExpectedPayment}`}
               </div>
+              <div>Total Users Winning: {payload.totalUsersWinning}</div>
             </div>
+          </div>
+
+          <div className="mt-3">
+            <select
+              value={multiplier}
+              disabled={!canSelect}
+              onChange={(e) => setMultiplier(e.target.value)}
+              className="h-9 w-full rounded-[3px] border border-gray-300 bg-white px-2 text-[12px] text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:outline-none disabled:bg-[#E9ECEF]"
+            >
+              {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </div>
 
           {live?.pending_manual ? (
@@ -336,16 +341,19 @@ export default function TripleChanceLiveResultPage() {
             <input
               type="text"
               inputMode="numeric"
-              maxLength={3}
+              maxLength={2}
               value={resultInput}
               disabled={!canSelect}
               onChange={(e) => {
-                const next = e.target.value.replace(/\D/g, "").slice(0, 3);
+                const next = e.target.value.replace(/\D/g, "").slice(0, 2);
                 setResultInput(next);
-                const card = digitsToTripleWinCard(next);
-                setSelected(card ?? "");
+                if (isRouletteMiniNumber(next)) {
+                  setSelected(String(Number(next)));
+                } else {
+                  setSelected("");
+                }
               }}
-              placeholder="0–999"
+              placeholder="0–36"
               className="h-9 w-[72px] rounded-[3px] border border-gray-300 bg-white px-2 text-center text-[13px] font-semibold text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:outline-none disabled:bg-[#E9ECEF]"
             />
             <button
@@ -357,12 +365,6 @@ export default function TripleChanceLiveResultPage() {
             >
               {saveBusy ? "…" : "SAVE"}
             </button>
-            <div
-              className="flex h-9 min-w-[72px] max-w-full items-center justify-center rounded-[3px] border border-gray-300 bg-[#E9ECEF] px-2 text-center text-[12px] font-semibold text-gray-900"
-              title={selected}
-            >
-              {selected || "—"}
-            </div>
           </div>
           {saveMsg ? (
             <p className="mt-2 text-center text-[11px] text-gray-600">{saveMsg}</p>
@@ -386,15 +388,17 @@ export default function TripleChanceLiveResultPage() {
             </div>
           </div>
 
-          <div className="mt-3 max-h-[140px] overflow-y-auto rounded-[3px] border border-gray-200 bg-white px-3 py-2 sm:max-h-[220px]">
+          <div className="mt-3 overflow-x-auto rounded-[3px] border border-gray-200 bg-white px-2 py-2 sm:px-3">
             {payload.recentResults.length === 0 ? (
-              <p className="py-2 text-center text-[12px] text-gray-500">No recent results</p>
+              <p className="py-1 text-center text-[12px] text-gray-500">No recent results</p>
             ) : (
-              <ul className="space-y-1 text-center text-[12px] font-medium tabular-nums text-gray-800 sm:text-[13px]">
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[12px] font-medium tabular-nums text-gray-800 sm:text-[13px]">
                 {payload.recentResults.map((line, idx) => (
-                  <li key={`${idx}-${line}`}>{line}</li>
+                  <span key={`${idx}-${line}`} className="whitespace-nowrap">
+                    {line}
+                  </span>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </div>
@@ -407,16 +411,16 @@ export default function TripleChanceLiveResultPage() {
           step="any"
           value={balanceInput}
           onChange={(e) => setBalanceInput(e.target.value)}
-          placeholder="Enter your Balance."
+          placeholder="Enter your Balance"
           className="h-9 min-w-0 w-full flex-1 rounded-[3px] border border-gray-300 bg-white px-3 text-[13px] text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:outline-none"
         />
         <button
           type="button"
           disabled={addBusy}
           onClick={() => void handleAddBalance()}
-          className="h-9 w-full shrink-0 rounded-[3px] bg-[#0d6efd] px-5 text-[13px] font-semibold text-white shadow-sm outline-none hover:bg-[#0b5ed7] focus:outline-none disabled:opacity-50 sm:w-auto"
+          className="h-9 w-full shrink-0 rounded-[3px] bg-[#5A73F2] px-5 text-[13px] font-semibold text-white shadow-sm outline-none hover:bg-[#4a64eb] focus:outline-none disabled:opacity-50 sm:w-auto"
         >
-          {addBusy ? "Adding..." : "Add Balance."}
+          {addBusy ? "Adding..." : "Add Balance"}
         </button>
       </div>
     </section>

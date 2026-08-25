@@ -43,6 +43,7 @@ export const sidebarSections: MenuSection[] = [
       { title: 'Andar Bahar', href: '/live-reports/live-result/andar-bahar' },
       { title: 'Fun Target', href: '/live-reports/live-result/fun-target' },
       { title: 'Titli Sorat', href: '/live-reports/live-result/titli-sorat' },
+      { title: 'Roulette Mini', href: '/live-reports/live-result/roulette-mini' },
     ],
   },
   {
@@ -61,6 +62,7 @@ const ADMIN_ONLY = [
   '/live-reports/live-result/andar-bahar',
   '/live-reports/live-result/fun-target',
   '/live-reports/live-result/titli-sorat',
+  '/live-reports/live-result/roulette-mini',
   '/logs-activity/logs',
   '/reports/admin-commission-report',
 ];
