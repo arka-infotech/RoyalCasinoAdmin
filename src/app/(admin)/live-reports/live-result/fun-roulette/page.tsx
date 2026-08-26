@@ -8,24 +8,24 @@ import {
   countRouletteMiniUsersWinning,
   fetchLiveResultStatus,
   formatAdminMoney,
-  formatRouletteMiniHistoryEntry,
   getLuckyTimerLabel,
   getManualSaveButtonTitle,
   isRouletteMiniNumber,
+  normalizeRouletteWinCard,
   postAddLiveBalance,
   postManualLuckyResult,
   postResetLuckyBalance,
   rouletteMiniPocketExposure,
   rouletteMiniPocketTone,
-  ROULETTE_MINI_GAME_TYPE,
+  ROULETTE_FUN_GAME_TYPE,
   useLiveResultAdminSocket,
   useLuckyLiveDisplaySeconds,
   type LuckyGameStatusOk,
 } from "@/lib/luckyGameAdmin";
 
-const GAME_TYPE = ROULETTE_MINI_GAME_TYPE;
+const GAME_TYPE = ROULETTE_FUN_GAME_TYPE;
 
-/** Rows match the reference Live Result screenshot: 0–9 / 10–19 / 20–29 / 30–36 */
+/** Fun Roulette (European): 0–9 / 10–19 / 20–29 / 30–36 — no double zero. */
 const BOARD_ROWS: number[][] = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
   [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
@@ -43,7 +43,16 @@ function formatStake(n: number): string {
   return n.toFixed(2);
 }
 
-/** Number label color — 0 green, reds red, blacks black. */
+function formatHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
 function numberToneClass(tone: "green" | "red" | "black"): string {
   if (tone === "green") return "text-emerald-600";
   if (tone === "red") return "text-red-600";
@@ -56,7 +65,7 @@ function pocketBoxClass(tone: "green" | "red" | "black"): string {
   return "border-gray-800 bg-gray-900 text-white";
 }
 
-export default function RouletteMiniLiveResultPage() {
+export default function FunRouletteLiveResultPage() {
   useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
@@ -108,10 +117,10 @@ export default function RouletteMiniLiveResultPage() {
   const displaySeconds = useLuckyLiveDisplaySeconds(live);
   const canSelect = live?.phase === "betting";
 
-  const selectNumber = useCallback((n: string) => {
-    if (!isRouletteMiniNumber(n)) return;
-    setSelected(n);
-    setResultInput(n);
+  const selectCell = useCallback((key: string) => {
+    if (!isRouletteMiniNumber(key)) return;
+    setSelected(key);
+    setResultInput(key);
   }, []);
 
   const payload = useMemo(() => {
@@ -141,7 +150,7 @@ export default function RouletteMiniLiveResultPage() {
     const recentResults = (live?.last_win_cards ?? [])
       .slice(-5)
       .reverse()
-      .map(formatRouletteMiniHistoryEntry);
+      .map(formatHistoryEntry);
 
     return {
       timerLabel,
@@ -162,7 +171,9 @@ export default function RouletteMiniLiveResultPage() {
 
   async function handleSave() {
     setSaveMsg(null);
-    const winCard = selected || (isRouletteMiniNumber(resultInput) ? String(Number(resultInput)) : "");
+    const raw =
+      selected || (isRouletteMiniNumber(resultInput) ? String(Number(resultInput)) : "");
+    const winCard = normalizeRouletteWinCard(raw);
     if (!winCard) {
       setSaveMsg("Select or enter a number (0–36)");
       return;
@@ -229,7 +240,7 @@ export default function RouletteMiniLiveResultPage() {
   return (
     <section className="w-full min-w-0 overflow-x-hidden rounded-xl border bg-white p-2 shadow-sm sm:p-3 md:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <h1 className="text-[14px] font-medium text-gray-900">Roulette Mini</h1>
+        <h1 className="text-[14px] font-medium text-gray-900">Fun Roulette</h1>
         <button
           type="button"
           disabled={resetBusy}
@@ -251,17 +262,18 @@ export default function RouletteMiniLiveResultPage() {
                   row.length === 10 ? "grid-cols-10" : "grid-cols-7",
                 )}
               >
-                {row.map((n) => {
-                  const key = String(n);
-                  const stake = rouletteMiniPocketExposure(payload.totals, n);
+                {row.map((cell) => {
+                  const key = String(cell);
+                  const stake = rouletteMiniPocketExposure(payload.totals, cell);
                   const isSelected = selected === key;
-                  const tone = rouletteMiniPocketTone(n);
+                  const tone = rouletteMiniPocketTone(cell);
+                  const label = String(cell);
                   return (
                     <button
                       key={key}
                       type="button"
                       disabled={!canSelect}
-                      onClick={() => selectNumber(key)}
+                      onClick={() => selectCell(key)}
                       className={cn(
                         "flex min-w-0 flex-col items-center border-r border-[#7BA3C9] px-1.5 py-2 last:border-r-0 sm:px-2 sm:py-2.5",
                         "outline-none focus:outline-none focus-visible:outline-none",
@@ -274,8 +286,8 @@ export default function RouletteMiniLiveResultPage() {
                       )}
                       title={
                         canSelect
-                          ? `Select ${n}${stake > 0 ? ` (exposure ${formatStake(stake)})` : ""}`
-                          : String(n)
+                          ? `Select ${label}${stake > 0 ? ` (exposure ${formatStake(stake)})` : ""}`
+                          : label
                       }
                     >
                       <span
@@ -284,7 +296,7 @@ export default function RouletteMiniLiveResultPage() {
                           numberToneClass(tone),
                         )}
                       >
-                        {n}
+                        {label}
                       </span>
                       <span
                         className={cn(
@@ -357,7 +369,7 @@ export default function RouletteMiniLiveResultPage() {
               value={resultInput}
               disabled={!canSelect}
               onChange={(e) => {
-                const next = e.target.value.replace(/\D/g, "").slice(0, 2);
+                const next = e.target.value.replace(/[^\d]/g, "").slice(0, 2);
                 setResultInput(next);
                 if (isRouletteMiniNumber(next)) {
                   setSelected(String(Number(next)));

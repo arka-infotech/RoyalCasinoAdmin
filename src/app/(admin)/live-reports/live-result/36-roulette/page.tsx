@@ -8,7 +8,6 @@ import {
   countRouletteMiniUsersWinning,
   fetchLiveResultStatus,
   formatAdminMoney,
-  formatRouletteMiniHistoryEntry,
   getLuckyTimerLabel,
   getManualSaveButtonTitle,
   isRouletteMiniNumber,
@@ -17,13 +16,13 @@ import {
   postResetLuckyBalance,
   rouletteMiniPocketExposure,
   rouletteMiniPocketTone,
-  ROULETTE_MINI_GAME_TYPE,
+  ROULETTE_MINI_GREEN_GAME_TYPE,
   useLiveResultAdminSocket,
   useLuckyLiveDisplaySeconds,
   type LuckyGameStatusOk,
 } from "@/lib/luckyGameAdmin";
 
-const GAME_TYPE = ROULETTE_MINI_GAME_TYPE;
+const GAME_TYPE = ROULETTE_MINI_GREEN_GAME_TYPE;
 
 /** Rows match the reference Live Result screenshot: 0–9 / 10–19 / 20–29 / 30–36 */
 const BOARD_ROWS: number[][] = [
@@ -43,20 +42,32 @@ function formatStake(n: number): string {
   return n.toFixed(2);
 }
 
-/** Number label color — 0 green, reds red, blacks black. */
+/** Screenshot history style: `11 | 0X` */
+function formatHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
+/** Number label color — 0 green, reds red, blacks black (matches European pockets). */
 function numberToneClass(tone: "green" | "red" | "black"): string {
   if (tone === "green") return "text-emerald-600";
   if (tone === "red") return "text-red-600";
   return "text-gray-900";
 }
 
+/** Amount box fill — same pocket colors as Roulette Mini. */
 function pocketBoxClass(tone: "green" | "red" | "black"): string {
   if (tone === "green") return "border-emerald-600 bg-emerald-500 text-white";
   if (tone === "red") return "border-red-700 bg-red-600 text-white";
   return "border-gray-800 bg-gray-900 text-white";
 }
 
-export default function RouletteMiniLiveResultPage() {
+export default function ThirtySixRouletteLiveResultPage() {
   useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
@@ -141,7 +152,7 @@ export default function RouletteMiniLiveResultPage() {
     const recentResults = (live?.last_win_cards ?? [])
       .slice(-5)
       .reverse()
-      .map(formatRouletteMiniHistoryEntry);
+      .map(formatHistoryEntry);
 
     return {
       timerLabel,
@@ -229,7 +240,7 @@ export default function RouletteMiniLiveResultPage() {
   return (
     <section className="w-full min-w-0 overflow-x-hidden rounded-xl border bg-white p-2 shadow-sm sm:p-3 md:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <h1 className="text-[14px] font-medium text-gray-900">Roulette Mini</h1>
+        <h1 className="text-[14px] font-medium text-gray-900">36 Roulette</h1>
         <button
           type="button"
           disabled={resetBusy}

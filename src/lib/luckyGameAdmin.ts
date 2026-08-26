@@ -22,6 +22,18 @@ export const SPIN_TO_WIN_GAME_TYPE = "SPIN_TO_WIN";
 
 export const ROULETTE_MINI_GAME_TYPE = "ROULETTE_MINI";
 
+/** Admin Live Result for Roulette Mini Green — displayed as “36 Roulette”. */
+export const ROULETTE_MINI_GREEN_GAME_TYPE = "ROULETTE_MINI_GREEN";
+
+/** Admin Live Result for Fun Roulette (`roulette_fun` / ROULETTE_ZERO) — 0–36. */
+export const ROULETTE_FUN_GAME_TYPE = "ROULETTE_FUN";
+
+/** Admin Live Result for American Roulette (`roulette` / ROULETTE) — includes 00. */
+export const ROULETTE_GAME_TYPE = "ROULETTE";
+
+/** Admin Live Result for European Roulette (`roulette_european`) — single zero 0–36. */
+export const ROULETTE_EUROPEAN_GAME_TYPE = "ROULETTE_EUROPEAN";
+
 /** Spin To Win individual payout (matches backend game.config.ts). */
 export const SPIN_TO_WIN_PAYOUT = 9;
 
@@ -29,6 +41,7 @@ export {
   ROULETTE_MINI_STRAIGHT_PAYOUT,
   ROULETTE_MINI_RED,
   isRouletteMiniNumber,
+  normalizeRouletteWinCard,
   rouletteMiniPocketTone,
   calcRouletteMiniExpectedPayment,
   formatRouletteMiniHistoryEntry,
@@ -38,6 +51,15 @@ export {
   resolveRouletteMiniBetKey,
 } from "@/lib/rouletteMiniLive";
 export type { RouletteMiniStakeRow, RouletteMiniBetKind } from "@/lib/rouletteMiniLive";
+
+export {
+  isRouletteAmericanNumber,
+  normalizeRouletteAmericanWinCard,
+  rouletteAmericanPocketTone,
+  rouletteAmericanPocketExposure,
+  calcRouletteAmericanExpectedPayment,
+  countRouletteAmericanUsersWinning,
+} from "@/lib/rouletteAmericanLive";
 
 /** Triple Chance payout multipliers (matches backend game.config.ts). */
 export const TRIPLE_CHANCE_PAYOUT = {

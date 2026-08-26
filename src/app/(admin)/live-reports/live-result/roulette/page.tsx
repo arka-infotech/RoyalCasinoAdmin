@@ -4,33 +4,35 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 import {
-  calcRouletteMiniExpectedPayment,
-  countRouletteMiniUsersWinning,
+  calcRouletteAmericanExpectedPayment,
+  countRouletteAmericanUsersWinning,
   fetchLiveResultStatus,
   formatAdminMoney,
-  formatRouletteMiniHistoryEntry,
   getLuckyTimerLabel,
   getManualSaveButtonTitle,
-  isRouletteMiniNumber,
+  isRouletteAmericanNumber,
+  normalizeRouletteAmericanWinCard,
   postAddLiveBalance,
   postManualLuckyResult,
   postResetLuckyBalance,
-  rouletteMiniPocketExposure,
-  rouletteMiniPocketTone,
-  ROULETTE_MINI_GAME_TYPE,
+  rouletteAmericanPocketExposure,
+  rouletteAmericanPocketTone,
+  ROULETTE_GAME_TYPE,
   useLiveResultAdminSocket,
   useLuckyLiveDisplaySeconds,
   type LuckyGameStatusOk,
 } from "@/lib/luckyGameAdmin";
 
-const GAME_TYPE = ROULETTE_MINI_GAME_TYPE;
+const GAME_TYPE = ROULETTE_GAME_TYPE;
 
-/** Rows match the reference Live Result screenshot: 0–9 / 10–19 / 20–29 / 30–36 */
-const BOARD_ROWS: number[][] = [
+type BoardCell = number | "00";
+
+/** American Roulette board: 0–9 / 10–19 / 20–29 / 30–36 + 00 */
+const BOARD_ROWS: BoardCell[][] = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
   [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
   [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
-  [30, 31, 32, 33, 34, 35, 36],
+  [30, 31, 32, 33, 34, 35, 36, "00"],
 ];
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -43,7 +45,16 @@ function formatStake(n: number): string {
   return n.toFixed(2);
 }
 
-/** Number label color — 0 green, reds red, blacks black. */
+function formatHistoryEntry(entry: string): string {
+  const [card, rewardRaw] = entry.split("|");
+  const cardPart = (card ?? "").trim() || entry;
+  const reward =
+    rewardRaw != null && String(rewardRaw).trim() !== ""
+      ? String(rewardRaw).trim()
+      : "0";
+  return `${cardPart} | ${reward}X`;
+}
+
 function numberToneClass(tone: "green" | "red" | "black"): string {
   if (tone === "green") return "text-emerald-600";
   if (tone === "red") return "text-red-600";
@@ -56,7 +67,11 @@ function pocketBoxClass(tone: "green" | "red" | "black"): string {
   return "border-gray-800 bg-gray-900 text-white";
 }
 
-export default function RouletteMiniLiveResultPage() {
+function cellKey(cell: BoardCell): string {
+  return cell === "00" ? "00" : String(cell);
+}
+
+export default function RouletteLiveResultPage() {
   useRequireAdmin();
   const [selected, setSelected] = useState<string>("");
   const [resultInput, setResultInput] = useState<string>("");
@@ -108,10 +123,10 @@ export default function RouletteMiniLiveResultPage() {
   const displaySeconds = useLuckyLiveDisplaySeconds(live);
   const canSelect = live?.phase === "betting";
 
-  const selectNumber = useCallback((n: string) => {
-    if (!isRouletteMiniNumber(n)) return;
-    setSelected(n);
-    setResultInput(n);
+  const selectCell = useCallback((key: string) => {
+    if (!isRouletteAmericanNumber(key)) return;
+    setSelected(key);
+    setResultInput(key);
   }, []);
 
   const payload = useMemo(() => {
@@ -123,10 +138,10 @@ export default function RouletteMiniLiveResultPage() {
     const previewCard = selected || live?.pending_manual?.win_card || "";
 
     const totalExpectedPayment = previewCard
-      ? calcRouletteMiniExpectedPayment(totals, previewCard)
+      ? calcRouletteAmericanExpectedPayment(totals, previewCard)
       : null;
     const totalUsersWinning = previewCard
-      ? countRouletteMiniUsersWinning(previewCard, totals, usersByKey, userIdsByKey)
+      ? countRouletteAmericanUsersWinning(previewCard, totals, usersByKey, userIdsByKey)
       : 0;
 
     const dp = live?.daily_pot;
@@ -141,7 +156,7 @@ export default function RouletteMiniLiveResultPage() {
     const recentResults = (live?.last_win_cards ?? [])
       .slice(-5)
       .reverse()
-      .map(formatRouletteMiniHistoryEntry);
+      .map(formatHistoryEntry);
 
     return {
       timerLabel,
@@ -162,9 +177,16 @@ export default function RouletteMiniLiveResultPage() {
 
   async function handleSave() {
     setSaveMsg(null);
-    const winCard = selected || (isRouletteMiniNumber(resultInput) ? String(Number(resultInput)) : "");
+    const raw =
+      selected ||
+      (isRouletteAmericanNumber(resultInput)
+        ? resultInput === "00"
+          ? "00"
+          : String(Number(resultInput))
+        : "");
+    const winCard = normalizeRouletteAmericanWinCard(raw);
     if (!winCard) {
-      setSaveMsg("Select or enter a number (0–36)");
+      setSaveMsg("Select or enter a number (0–36 or 00)");
       return;
     }
     setSaveBusy(true);
@@ -229,7 +251,7 @@ export default function RouletteMiniLiveResultPage() {
   return (
     <section className="w-full min-w-0 overflow-x-hidden rounded-xl border bg-white p-2 shadow-sm sm:p-3 md:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <h1 className="text-[14px] font-medium text-gray-900">Roulette Mini</h1>
+        <h1 className="text-[14px] font-medium text-gray-900">Roulette</h1>
         <button
           type="button"
           disabled={resetBusy}
@@ -248,20 +270,21 @@ export default function RouletteMiniLiveResultPage() {
                 key={rowIdx}
                 className={cn(
                   "grid border-b border-[#7BA3C9] last:border-b-0",
-                  row.length === 10 ? "grid-cols-10" : "grid-cols-7",
+                  row.length === 10 ? "grid-cols-10" : "grid-cols-8",
                 )}
               >
-                {row.map((n) => {
-                  const key = String(n);
-                  const stake = rouletteMiniPocketExposure(payload.totals, n);
+                {row.map((cell) => {
+                  const key = cellKey(cell);
+                  const stake = rouletteAmericanPocketExposure(payload.totals, cell);
                   const isSelected = selected === key;
-                  const tone = rouletteMiniPocketTone(n);
+                  const tone = rouletteAmericanPocketTone(cell);
+                  const label = cell === "00" ? "00" : String(cell);
                   return (
                     <button
                       key={key}
                       type="button"
                       disabled={!canSelect}
-                      onClick={() => selectNumber(key)}
+                      onClick={() => selectCell(key)}
                       className={cn(
                         "flex min-w-0 flex-col items-center border-r border-[#7BA3C9] px-1.5 py-2 last:border-r-0 sm:px-2 sm:py-2.5",
                         "outline-none focus:outline-none focus-visible:outline-none",
@@ -274,8 +297,8 @@ export default function RouletteMiniLiveResultPage() {
                       )}
                       title={
                         canSelect
-                          ? `Select ${n}${stake > 0 ? ` (exposure ${formatStake(stake)})` : ""}`
-                          : String(n)
+                          ? `Select ${label}${stake > 0 ? ` (exposure ${formatStake(stake)})` : ""}`
+                          : label
                       }
                     >
                       <span
@@ -284,7 +307,7 @@ export default function RouletteMiniLiveResultPage() {
                           numberToneClass(tone),
                         )}
                       >
-                        {n}
+                        {label}
                       </span>
                       <span
                         className={cn(
@@ -357,15 +380,15 @@ export default function RouletteMiniLiveResultPage() {
               value={resultInput}
               disabled={!canSelect}
               onChange={(e) => {
-                const next = e.target.value.replace(/\D/g, "").slice(0, 2);
+                const next = e.target.value.replace(/[^\d]/g, "").slice(0, 2);
                 setResultInput(next);
-                if (isRouletteMiniNumber(next)) {
-                  setSelected(String(Number(next)));
+                if (isRouletteAmericanNumber(next)) {
+                  setSelected(next === "00" ? "00" : String(Number(next)));
                 } else {
                   setSelected("");
                 }
               }}
-              placeholder="0–36"
+              placeholder="0–36 / 00"
               className="h-9 w-[72px] rounded-[3px] border border-gray-300 bg-white px-2 text-center text-[13px] font-semibold text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:outline-none disabled:bg-[#E9ECEF]"
             />
             <button

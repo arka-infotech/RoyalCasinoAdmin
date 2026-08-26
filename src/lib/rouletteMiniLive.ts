@@ -59,7 +59,23 @@ const OUTSIDE: Record<string, { family: BetFamily; covers: (n: number) => boolea
   Even: { family: "even_money", covers: (n) => n !== 0 && n % 2 === 0, label: "Even" },
   ODD: { family: "even_money", covers: (n) => n !== 0 && n % 2 === 1, label: "Odd" },
   Red_Chokadi: { family: "even_money", covers: (n) => ROULETTE_MINI_RED.has(n), label: "Red" },
-  Black_Chokadi: { family: "even_money", covers: (n) => BLACK.has(n), label: "Black" },
+  Black_Chokadi: {
+    family: "even_money",
+    covers: (n) => BLACK.has(n),
+    label: "Black",
+  },
+  // Fun Roulette highlight aliases (Unity object names)
+  _1st12: { family: "dozen", covers: (n) => n >= 1 && n <= 12, label: "1st 12" },
+  _2st12: { family: "dozen", covers: (n) => n >= 13 && n <= 24, label: "2nd 12" },
+  _3st12: { family: "dozen", covers: (n) => n >= 25 && n <= 36, label: "3rd 12" },
+  _1to18: { family: "even_money", covers: (n) => n >= 1 && n <= 18, label: "1 to 18" },
+  _19to36: { family: "even_money", covers: (n) => n >= 19 && n <= 36, label: "19 to 36" },
+  Odd: { family: "even_money", covers: (n) => n !== 0 && n % 2 === 1, label: "Odd" },
+  Red_c: { family: "even_money", covers: (n) => ROULETTE_MINI_RED.has(n), label: "Red" },
+  Black_c: { family: "even_money", covers: (n) => BLACK.has(n), label: "Black" },
+  _2to1_1: { family: "column", covers: (n) => n >= 1 && n % 3 === 1, label: "2:1 Col 1" },
+  _2to1_2: { family: "column", covers: (n) => n >= 1 && n % 3 === 2, label: "2:1 Col 2" },
+  _2to1_3: { family: "column", covers: (n) => n >= 1 && n % 3 === 0, label: "2:1 Col 3" },
   "2To1_FirstRow": {
     family: "column",
     covers: (n) => n >= 1 && n % 3 === 1,
@@ -213,8 +229,14 @@ export function isRouletteMiniNumber(n: string): boolean {
   return Number.isInteger(v) && v >= 0 && v <= 36;
 }
 
-export function rouletteMiniPocketTone(n: number): "green" | "red" | "black" {
-  if (n === 0) return "green";
+/** Normalize European admin selection (0–36). */
+export function normalizeRouletteWinCard(n: string): string {
+  if (!isRouletteMiniNumber(n)) return "";
+  return String(Number(n));
+}
+
+export function rouletteMiniPocketTone(n: number | "00"): "green" | "red" | "black" {
+  if (n === "00" || n === 0) return "green";
   return ROULETTE_MINI_RED.has(n) ? "red" : "black";
 }
 
@@ -282,8 +304,9 @@ export function resolveRouletteMiniBetKey(key: string): ResolvedRouletteBet | nu
       family: "straight",
       kind: "straight",
       multiplier: MULTIPLIER.straight,
-      label: "0",
+      label: "00",
       covers: [0],
+      // European Fun/Mini treat unknown "00" chips as pocket 0.
       hits: (win) => win === 0,
     };
   }
@@ -346,8 +369,9 @@ export function calcRouletteMiniExpectedPayment(
   totals: Record<string, number> | undefined,
   winCard: string,
 ): number {
-  if (!totals || !isRouletteMiniNumber(winCard)) return 0;
-  const win = Number(winCard);
+  const normalized = normalizeRouletteWinCard(winCard);
+  if (!totals || !normalized) return 0;
+  const win = Number(normalized);
   let total = 0;
 
   for (const [key, stakeRaw] of Object.entries(totals)) {
@@ -384,16 +408,21 @@ export function calcRouletteMiniExpectedPayment(
   return Math.round((total + Number.EPSILON) * 100) / 100;
 }
 
-/** Stake visible on pocket `n`: straight + every multi/outside/french/neighbour that covers it. */
+/** Stake visible on pocket `n` (or Fun UI cell "00"). */
 export function rouletteMiniPocketExposure(
   totals: Record<string, number> | undefined,
-  pocket: number,
+  pocket: number | "00",
 ): number {
   if (!totals) return 0;
+  if (pocket === "00") {
+    return Math.round(((Number(totals["00"]) || 0) + Number.EPSILON) * 100) / 100;
+  }
   let sum = 0;
   for (const [key, stakeRaw] of Object.entries(totals)) {
     const stake = Number(stakeRaw);
     if (!stake || stake <= 0) continue;
+    // Don't double-count Fun "00" onto the European 0 cell — separate UI pockets.
+    if (key === "00") continue;
     const bet = resolveRouletteMiniBetKey(key);
     if (!bet) continue;
     if (bet.covers.includes(pocket)) sum += stake;
@@ -452,8 +481,9 @@ export function countRouletteMiniUsersWinning(
   usersByKey: Record<string, number> | undefined,
   userIdsByKey?: Record<string, string[]> | undefined,
 ): number {
-  if (!totals || !isRouletteMiniNumber(winCard)) return 0;
-  const win = Number(winCard);
+  const normalized = normalizeRouletteWinCard(winCard);
+  if (!totals || !normalized) return 0;
+  const win = Number(normalized);
 
   if (userIdsByKey) {
     const ids = new Set<string>();
@@ -463,7 +493,7 @@ export function countRouletteMiniUsersWinning(
       if (!bet || !bet.hits(win)) continue;
       // French: "hits" means any covered number — payout may still be 0 if no chip spot hits;
       // mirror payment: treat as winning user if expected payment contribution > 0.
-      const pay = calcRouletteMiniExpectedPayment({ [key]: Number(stakeRaw) }, winCard);
+      const pay = calcRouletteMiniExpectedPayment({ [key]: Number(stakeRaw) }, normalized);
       if (pay <= 0) continue;
       for (const uid of userIdsByKey[key] ?? []) ids.add(uid);
     }
@@ -473,7 +503,7 @@ export function countRouletteMiniUsersWinning(
   let total = 0;
   for (const [key, stakeRaw] of Object.entries(totals)) {
     if (!Number(stakeRaw)) continue;
-    const pay = calcRouletteMiniExpectedPayment({ [key]: Number(stakeRaw) }, winCard);
+    const pay = calcRouletteMiniExpectedPayment({ [key]: Number(stakeRaw) }, normalized);
     if (pay <= 0) continue;
     total += usersByKey?.[key] ?? 0;
   }
