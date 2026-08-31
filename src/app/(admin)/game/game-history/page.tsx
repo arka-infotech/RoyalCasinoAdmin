@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 
 import {
+  ADMIN_GAME_HISTORY_GAME_TYPES,
+  ADMIN_GAME_HISTORY_LABELS,
+  formatAdminGameHistoryGameType,
   useAdminGameHistorySocket,
+  type AdminGameHistoryFilter,
   type AdminGameHistoryRow,
 } from "@/lib/luckyGameAdmin";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
-
-type GameTypeFilter = "ALL" | "LUCKY_CARD_12" | "LUCKY_CARD_16";
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -32,7 +34,7 @@ export default function GameHistoryPage() {
   useRequireAdmin();
   const [fromDate, setFromDate] = useState(todayIsoDate());
   const [toDate, setToDate] = useState(todayIsoDate());
-  const [gameType, setGameType] = useState<GameTypeFilter>("ALL");
+  const [gameType, setGameType] = useState<AdminGameHistoryFilter>("ALL");
   const [rows, setRows] = useState<AdminGameHistoryRow[]>([]);
 
   const fromISO = useMemo(() => new Date(`${fromDate}T00:00:00.000`).toISOString(), [fromDate]);
@@ -52,7 +54,7 @@ export default function GameHistoryPage() {
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Game History</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Live bet history across all players for Lucky 12 / Lucky 16.
+            Live bet history across all players for every implemented Royal Casino game.
           </p>
         </div>
         <span
@@ -96,12 +98,15 @@ export default function GameHistoryPage() {
           Game
           <select
             value={gameType}
-            onChange={(e) => setGameType(e.target.value as GameTypeFilter)}
-            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            onChange={(e) => setGameType(e.target.value as AdminGameHistoryFilter)}
+            className="h-10 min-w-[180px] rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="ALL">All games</option>
-            <option value="LUCKY_CARD_12">Lucky 12</option>
-            <option value="LUCKY_CARD_16">Lucky 16</option>
+            {ADMIN_GAME_HISTORY_GAME_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {ADMIN_GAME_HISTORY_LABELS[type]}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -129,7 +134,7 @@ export default function GameHistoryPage() {
                 </td>
                 <td className="px-3 py-3 font-medium text-gray-900">{row.username}</td>
                 <td className="px-3 py-3 text-gray-600">
-                  {row.game_type === "LUCKY_CARD_12" ? "Lucky 12" : row.game_type === "LUCKY_CARD_16" ? "Lucky 16" : "—"}
+                  {formatAdminGameHistoryGameType(row.game_type)}
                 </td>
                 <td className="px-3 py-3 text-gray-500">{row.ticket_id ?? "—"}</td>
                 <td className="px-3 py-3 text-gray-600">{row.result_card ?? "—"}</td>

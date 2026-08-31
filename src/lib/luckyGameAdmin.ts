@@ -34,6 +34,46 @@ export const ROULETTE_GAME_TYPE = "ROULETTE";
 /** Admin Live Result for European Roulette (`roulette_european`) — single zero 0–36. */
 export const ROULETTE_EUROPEAN_GAME_TYPE = "ROULETTE_EUROPEAN";
 
+/** gameType labels for admin game-history — must match backend `game-id.util`. */
+export const ADMIN_GAME_HISTORY_GAME_TYPES = [
+  "LUCKY_CARD_12",
+  "LUCKY_CARD_16",
+  "TRIPLE_CHANCE",
+  "SPIN_TO_WIN",
+  "ANDAR_BAHAR",
+  "SINGLE_CHANCE_3D",
+  "LUCKY_SORAT",
+  "ROULETTE_MINI",
+  "ROULETTE_MINI_GREEN",
+  "ROULETTE_FUN",
+  "ROULETTE",
+  "ROULETTE_EUROPEAN",
+] as const;
+
+export type AdminGameHistoryGameType = (typeof ADMIN_GAME_HISTORY_GAME_TYPES)[number];
+export type AdminGameHistoryFilter = "ALL" | AdminGameHistoryGameType;
+
+export const ADMIN_GAME_HISTORY_LABELS: Record<AdminGameHistoryGameType, string> = {
+  LUCKY_CARD_12: "Lucky 12",
+  LUCKY_CARD_16: "Lucky 16",
+  TRIPLE_CHANCE: "Triple Chance",
+  SPIN_TO_WIN: "Spin To Win",
+  ANDAR_BAHAR: "Andar Bahar",
+  SINGLE_CHANCE_3D: "Fun Target",
+  LUCKY_SORAT: "Titli Sorat",
+  ROULETTE_MINI: "Roulette Mini",
+  ROULETTE_MINI_GREEN: "36 Roulette",
+  ROULETTE_FUN: "Fun Roulette",
+  ROULETTE: "Roulette",
+  ROULETTE_EUROPEAN: "European Roulette",
+};
+
+export function formatAdminGameHistoryGameType(gameType: string | null | undefined): string {
+  if (!gameType) return "—";
+  const key = gameType as AdminGameHistoryGameType;
+  return ADMIN_GAME_HISTORY_LABELS[key] ?? gameType;
+}
+
 /** Spin To Win individual payout (matches backend game.config.ts). */
 export const SPIN_TO_WIN_PAYOUT = 9;
 
@@ -405,7 +445,7 @@ export type AdminGameHistoryOk = {
 };
 
 export function useAdminGameHistorySocket(params: {
-  gameType: "LUCKY_CARD_12" | "LUCKY_CARD_16" | "ALL";
+  gameType: AdminGameHistoryFilter;
   fromISO: string;
   toISO: string;
   take?: number;
