@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
+import { apiPath } from "@/lib/apiPath";
 
 type GameSettingRow = {
   gameId: string;
@@ -25,7 +26,7 @@ export default function WinPercentagePage() {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/admin/game-settings", { cache: "no-store" });
+        const res = await fetch(apiPath("/api/admin/game-settings"), { cache: "no-store" });
         const json = (await res.json()) as {
           ok?: boolean;
           settings?: GameSettingRow[];
@@ -70,7 +71,7 @@ export default function WinPercentagePage() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/game-settings", {
+      const res = await fetch(apiPath("/api/admin/game-settings"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates }),

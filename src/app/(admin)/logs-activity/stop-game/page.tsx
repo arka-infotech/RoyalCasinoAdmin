@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
+import { apiPath } from "@/lib/apiPath";
 
 type StopMode = "stop" | "start";
 
@@ -18,7 +19,7 @@ export default function StopGamePage() {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/admin/stop-game", { cache: "no-store" });
+        const res = await fetch(apiPath("/api/admin/stop-game"), { cache: "no-store" });
         const json = (await res.json()) as { ok?: boolean; stopped?: boolean; error?: string };
         if (!res.ok || !json.ok) {
           throw new Error(json.error || "Failed to load stop-game status");
@@ -45,7 +46,7 @@ export default function StopGamePage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/stop-game", {
+      const res = await fetch(apiPath("/api/admin/stop-game"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stopped }),
