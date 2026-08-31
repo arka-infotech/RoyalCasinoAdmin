@@ -44,7 +44,7 @@ export default function GameHistoryPage() {
     gameType,
     fromISO,
     toISO,
-    take: 200,
+    take: gameType === "ALL" ? 500 : 200,
     onRows: setRows,
   });
 
