@@ -1,9 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { buildQuery, proxyToBackend } from '@/lib/backendProxy';
 
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message: 'Transaction report coming soon',
-    data: { report: [] },
-  });
+export async function GET(req: NextRequest) {
+  return proxyToBackend(`/api/reports/transactions${buildQuery(req)}`);
 }

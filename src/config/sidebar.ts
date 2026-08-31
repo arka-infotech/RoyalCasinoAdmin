@@ -52,7 +52,10 @@ export const sidebarSections: MenuSection[] = [
   },
   {
     title: 'LOGS ACTIVITY',
-    items: [{ title: 'Logs', href: '/logs-activity/logs' }],
+    items: [
+      { title: 'Logs', href: '/logs-activity/logs' },
+      { title: 'Stop Game', href: '/logs-activity/stop-game' },
+    ],
   },
 ];
 
@@ -72,6 +75,7 @@ const ADMIN_ONLY = [
   '/live-reports/live-result/roulette',
   '/live-reports/live-result/fun-roulette',
   '/logs-activity/logs',
+  '/logs-activity/stop-game',
   '/reports/admin-commission-report',
 ];
 

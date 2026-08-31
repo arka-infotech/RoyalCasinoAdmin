@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useCommissionReport } from "@/hooks/useGames";
 
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import { SortableTh } from "@/components/admin/SortableTh";
@@ -9,14 +11,18 @@ import { sortRowsByKey, type SortDir } from "@/lib/tableSort";
 type CommissionPayoutReportRow = {
   no: number;
   username: string;
-  role: "Super Distributor" | "Distributor" | "Retailer";
-  oldCommission: number;
-  amount: number;
-  newCommission: number;
-  createdAt: string;
+  role: string;
+  commissionRate: number;
+  totalBet: number;
+  commissionEarned: number;
 };
 
-const demoRows: CommissionPayoutReportRow[] = [];
+const ROLE_LABELS: Record<string, string> = {
+  super_distributor: "Super Distributor",
+  distributor: "Distributor",
+  retailer: "Retailer",
+  user: "User",
+};
 
 function formatNumber(value: number) {
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -28,6 +34,12 @@ export default function CommissionPayoutReportViewPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const { data, isLoading, error } = useCommissionReport();
+
+  useEffect(() => {
+    if (error) toast.error("Failed to load commission payout report");
+  }, [error]);
 
   const requestSort = useCallback(
     (key: string) => {
@@ -41,21 +53,38 @@ export default function CommissionPayoutReportViewPage() {
     [sortKey]
   );
 
+  const rawRows = useMemo<CommissionPayoutReportRow[]>(() => {
+    const report = (data?.data?.report ?? []) as Array<{
+      username: string;
+      role: string;
+      commission_rate: string | number;
+      total_bet: string | number;
+      commission_earned: string | number;
+    }>;
+
+    return report.map((row, index) => ({
+      no: index + 1,
+      username: row.username,
+      role: row.role,
+      commissionRate: Number(row.commission_rate) || 0,
+      totalBet: Number(row.total_bet) || 0,
+      commissionEarned: Number(row.commission_earned) || 0,
+    }));
+  }, [data]);
+
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return demoRows.filter((r) => {
-      if (!q) return true;
+    if (!q) return rawRows;
+    return rawRows.filter((r) => {
       return (
-        String(r.no).includes(q) ||
         r.username.toLowerCase().includes(q) ||
         r.role.toLowerCase().includes(q) ||
-        String(r.oldCommission).includes(q) ||
-        String(r.amount).includes(q) ||
-        String(r.newCommission).includes(q) ||
-        r.createdAt.toLowerCase().includes(q)
+        String(r.commissionRate).includes(q) ||
+        String(r.totalBet).includes(q) ||
+        String(r.commissionEarned).includes(q)
       );
     });
-  }, [searchQuery]);
+  }, [rawRows, searchQuery]);
 
   const sortedRows = useMemo(() => {
     if (!sortKey) return filteredRows;
@@ -145,67 +174,69 @@ export default function CommissionPayoutReportViewPage() {
                 ROLE
               </SortableTh>
               <SortableTh
-                columnKey="oldCommission"
+                columnKey="commissionRate"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={requestSort}
                 className="border border-gray-200 px-3 py-2"
               >
-                OLD COMMISSION
+                COMMISSION %
               </SortableTh>
               <SortableTh
-                columnKey="amount"
+                columnKey="totalBet"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={requestSort}
                 className="border border-gray-200 px-3 py-2"
               >
-                AMOUNT
+                TOTAL BET
               </SortableTh>
               <SortableTh
-                columnKey="newCommission"
+                columnKey="commissionEarned"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={requestSort}
                 className="border border-gray-200 px-3 py-2"
               >
-                NEW COMMISSION
-              </SortableTh>
-              <SortableTh
-                columnKey="createdAt"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={requestSort}
-                className="border border-gray-200 px-3 py-2"
-              >
-                CREATED
+                COMMISSION EARNED
               </SortableTh>
             </tr>
           </thead>
           <tbody>
-            {currentEntries.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <td key={j} className="border border-gray-200 px-3 py-3">
+                      <div className="h-4 animate-pulse rounded bg-gray-200" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : currentEntries.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="border border-gray-200 px-3 py-8 text-center text-sm text-gray-600"
                 >
                   No data available in table
                 </td>
               </tr>
             ) : (
-              currentEntries.map((row) => (
-                <tr key={`${row.no}-${row.username}-${row.createdAt}`} className="text-gray-700">
-                  <td className="border border-gray-200 px-3 py-3">{row.no}</td>
+              currentEntries.map((row, idx) => (
+                <tr key={`${row.username}-${row.role}`} className="text-gray-700">
+                  <td className="border border-gray-200 px-3 py-3">{startIndex + idx + 1}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.username}</td>
-                  <td className="border border-gray-200 px-3 py-3">{row.role}</td>
                   <td className="border border-gray-200 px-3 py-3">
-                    {formatNumber(row.oldCommission)}
+                    {ROLE_LABELS[row.role] ?? row.role}
                   </td>
-                  <td className="border border-gray-200 px-3 py-3">{formatNumber(row.amount)}</td>
                   <td className="border border-gray-200 px-3 py-3">
-                    {formatNumber(row.newCommission)}
+                    {formatNumber(row.commissionRate)}%
                   </td>
-                  <td className="border border-gray-200 px-3 py-3">{row.createdAt}</td>
+                  <td className="border border-gray-200 px-3 py-3">{formatNumber(row.totalBet)}</td>
+                  <td className="border border-gray-200 px-3 py-3">
+                    {formatNumber(row.commissionEarned)}
+                  </td>
                 </tr>
               ))
             )}
@@ -224,4 +255,3 @@ export default function CommissionPayoutReportViewPage() {
     </section>
   );
 }
-
