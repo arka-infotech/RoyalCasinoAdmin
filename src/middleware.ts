@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { COOKIE_NAME } from '@/lib/auth';
+import { stripBasePath } from '@/lib/basePath';
 
 const PUBLIC_PATHS = [
   '/login',
@@ -11,10 +12,10 @@ const PUBLIC_PATHS = [
 ];
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const pathname = stripBasePath(req.nextUrl.pathname);
 
   // Allow public paths
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next();
   }
 
@@ -23,8 +24,6 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // In middleware (edge runtime), avoid JWT verification libraries that may fail.
-  // Presence of the auth cookie is enough for routing; API routes still verify token.
   const hasAdminCookie = Boolean(req.cookies.get(COOKIE_NAME)?.value);
 
   // Protect API routes (return 401)
@@ -35,10 +34,15 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Root: send to login or dashboard (avoid hitting page.tsx redirect chain)
+  if (pathname === '/') {
+    const target = hasAdminCookie ? '/dashboard' : '/login';
+    return NextResponse.redirect(new URL(target, req.url));
+  }
+
   // Protect admin pages (redirect to login)
   if (!hasAdminCookie) {
-    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-    return NextResponse.redirect(new URL(`${base}/login`, req.nextUrl.origin));
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 
   return NextResponse.next();
