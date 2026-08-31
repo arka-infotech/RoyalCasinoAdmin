@@ -1,5 +1,6 @@
 "use client";
 
+import Image, { type StaticImageData } from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
@@ -7,7 +8,6 @@ import {
   calcTitliSoratExpectedPayment,
   fetchLiveResultStatus,
   formatAdminMoney,
-  formatTitliSoratHistoryEntry,
   getLuckyTimerLabel,
   getManualSaveButtonTitle,
   isTitliSoratSymbol,
@@ -19,7 +19,13 @@ import {
   useLiveResultAdminSocket,
   useLuckyLiveDisplaySeconds,
   type LuckyGameStatusOk,
+  type TitliSoratSymbol,
 } from "@/lib/luckyGameAdmin";
+import {
+  getTitliSoratImage,
+  parseTitliSoratHistoryEntry,
+  TITLI_SORAT_IMAGES,
+} from "@/lib/titliSoratAssets";
 
 const GAME_TYPE = TITLI_SORAT_GAME_TYPE;
 
@@ -31,6 +37,104 @@ function formatStake(n: number): string {
   if (!n) return "0";
   if (Number.isInteger(n)) return String(n);
   return n.toFixed(2);
+}
+
+function SymbolImage({
+  symbol,
+  src,
+  className,
+  priority,
+}: {
+  symbol: string;
+  src: StaticImageData;
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src={src}
+      alt={symbol}
+      width={src.width}
+      height={src.height}
+      priority={priority}
+      className={cn("h-full w-full object-contain", className)}
+    />
+  );
+}
+
+function SymbolTile({
+  symbol,
+  imageSrc,
+  stake,
+  selected,
+  canSelect,
+  onSelect,
+}: {
+  symbol: TitliSoratSymbol;
+  imageSrc: StaticImageData;
+  stake: number;
+  selected: boolean;
+  canSelect: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <div className="min-w-0">
+      <label
+        className={cn(
+          "relative flex aspect-square w-full min-h-0 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[2px] border bg-white p-1.5 shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:p-2",
+          selected ? "border-blue-500 ring-1 ring-blue-400" : "border-gray-300",
+          !canSelect && "cursor-default",
+        )}
+      >
+        {canSelect ? (
+          <input
+            type="radio"
+            name="titli-sorat-selection"
+            checked={selected}
+            onChange={onSelect}
+            className="absolute left-1 top-1 z-10 h-3 w-3 accent-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:left-2 sm:top-2 sm:h-4 sm:w-4"
+            aria-label={`Select ${symbol}`}
+          />
+        ) : null}
+        <div className="flex h-full w-full items-center justify-center">
+          <SymbolImage symbol={symbol} src={imageSrc} className="max-h-[72px] max-w-[72px] sm:max-h-[88px] sm:max-w-[88px]" />
+        </div>
+      </label>
+      <div className="mt-1 rounded-[2px] border border-gray-200 bg-[#E9ECEF] px-0.5 py-0.5 sm:mt-1.5 sm:px-1 sm:py-1">
+        <div
+          className={cn(
+            "flex h-4 items-center justify-center overflow-hidden rounded-[2px] border border-gray-200 px-0.5 text-[9px] font-medium tabular-nums sm:h-6 sm:text-[12px]",
+            stake > 0 ? "bg-orange-300/80 text-gray-800" : "bg-white text-gray-600",
+          )}
+        >
+          {formatStake(stake)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryResultChip({ entry }: { entry: string }) {
+  const { symbol, reward } = parseTitliSoratHistoryEntry(entry);
+  const imageSrc = getTitliSoratImage(symbol);
+
+  return (
+    <div
+      className="flex flex-col items-center gap-0.5 rounded-[2px] border border-gray-200 bg-[#F8F9FA] px-1.5 py-1"
+      title={`${symbol} | ${reward}X`}
+    >
+      <div className="flex h-10 w-10 items-center justify-center sm:h-11 sm:w-11">
+        {imageSrc ? (
+          <SymbolImage symbol={symbol} src={imageSrc} />
+        ) : (
+          <span className="text-[10px] font-medium text-gray-700">{symbol}</span>
+        )}
+      </div>
+      <span className="text-[10px] font-semibold tabular-nums text-gray-800 sm:text-[11px]">
+        {reward}X
+      </span>
+    </div>
+  );
 }
 
 export default function TitliSoratLiveResultPage() {
@@ -117,9 +221,7 @@ export default function TitliSoratLiveResultPage() {
         ? null
         : Math.round((liveCollection - livePayment + Number.EPSILON) * 100) / 100;
 
-    const recentResults = (live?.last_win_cards ?? [])
-      .slice(0, 12)
-      .map(formatTitliSoratHistoryEntry);
+    const recentResults = (live?.last_win_cards ?? []).slice(0, 12);
 
     return {
       timerLabel,
@@ -226,41 +328,15 @@ export default function TitliSoratLiveResultPage() {
                 const stake = payload.totals[symbol] ?? 0;
                 const isSelected = selected === symbol;
                 return (
-                  <div key={symbol} className="min-w-0">
-                    <label
-                      className={cn(
-                        "relative flex aspect-square w-full min-h-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-[2px] border bg-white p-1 text-center shadow-[0_1px_0_rgba(0,0,0,0.04)]",
-                        isSelected ? "border-blue-500" : "border-gray-300",
-                        !canSelect && "cursor-default",
-                      )}
-                    >
-                      {canSelect ? (
-                        <input
-                          type="radio"
-                          name="titli-sorat-selection"
-                          checked={isSelected}
-                          onChange={() => selectSymbol(symbol)}
-                          className="absolute left-1 top-1 z-10 h-3 w-3 accent-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:left-2 sm:top-2 sm:h-4 sm:w-4"
-                          aria-label={`Select ${symbol}`}
-                        />
-                      ) : null}
-                      <span className="break-words text-[clamp(0.6rem,2.6vw,0.85rem)] font-semibold leading-tight text-gray-900">
-                        {symbol}
-                      </span>
-                    </label>
-                    <div className="mt-1 rounded-[2px] border border-gray-200 bg-[#E9ECEF] px-0.5 py-0.5 sm:mt-1.5 sm:px-1 sm:py-1">
-                      <div
-                        className={cn(
-                          "flex h-4 items-center justify-center overflow-hidden rounded-[2px] border border-gray-200 px-0.5 text-[9px] font-medium tabular-nums sm:h-6 sm:text-[12px]",
-                          stake > 0
-                            ? "bg-orange-300/80 text-gray-800"
-                            : "bg-white text-gray-600",
-                        )}
-                      >
-                        {formatStake(stake)}
-                      </div>
-                    </div>
-                  </div>
+                  <SymbolTile
+                    key={symbol}
+                    symbol={symbol}
+                    imageSrc={TITLI_SORAT_IMAGES[symbol]}
+                    stake={stake}
+                    selected={isSelected}
+                    canSelect={canSelect}
+                    onSelect={() => selectSymbol(symbol)}
+                  />
                 );
               })}
             </div>
@@ -306,19 +382,37 @@ export default function TitliSoratLiveResultPage() {
           </div>
 
           {live?.pending_manual ? (
-            <div className="mt-3 rounded-[3px] border border-amber-200 bg-amber-50 px-2 py-2 text-center text-[11px] text-amber-900 sm:px-3">
-              Locked manual winner:{" "}
-              <span className="font-semibold">{live.pending_manual.win_card}</span> (reward{" "}
-              {live.pending_manual.reward}) — applied at spin.
+            <div className="mt-3 flex flex-col items-center gap-2 rounded-[3px] border border-amber-200 bg-amber-50 px-2 py-2 text-center text-[11px] text-amber-900 sm:px-3">
+              <span>
+                Locked manual winner (reward {live.pending_manual.reward}) — applied at spin.
+              </span>
+              {getTitliSoratImage(live.pending_manual.win_card) ? (
+                <div className="flex h-12 w-12 items-center justify-center">
+                  <SymbolImage
+                    symbol={live.pending_manual.win_card}
+                    src={getTitliSoratImage(live.pending_manual.win_card)!}
+                  />
+                </div>
+              ) : (
+                <span className="font-semibold">{live.pending_manual.win_card}</span>
+              )}
             </div>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
             <div
-              className="flex h-9 min-w-[120px] max-w-full items-center justify-center rounded-[3px] border border-gray-300 bg-[#E9ECEF] px-2 text-center text-[12px] font-semibold text-gray-900"
+              className="flex h-12 min-w-[120px] max-w-full items-center justify-center rounded-[3px] border border-gray-300 bg-[#E9ECEF] px-2"
               title={selected}
             >
-              {selected || "Select a symbol"}
+              {selected && getTitliSoratImage(selected) ? (
+                <div className="flex h-10 w-10 items-center justify-center">
+                  <SymbolImage symbol={selected} src={getTitliSoratImage(selected)!} />
+                </div>
+              ) : (
+                <span className="text-center text-[12px] font-semibold text-gray-900">
+                  {selected || "Select a symbol"}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -356,11 +450,9 @@ export default function TitliSoratLiveResultPage() {
             {payload.recentResults.length === 0 ? (
               <p className="py-1 text-center text-[12px] text-gray-500">No recent results</p>
             ) : (
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[12px] font-medium tabular-nums text-gray-800 sm:text-[13px]">
-                {payload.recentResults.map((line, idx) => (
-                  <span key={`${idx}-${line}`} className="whitespace-nowrap">
-                    {line}
-                  </span>
+              <div className="flex flex-wrap justify-center gap-2">
+                {payload.recentResults.map((entry, idx) => (
+                  <HistoryResultChip key={`${idx}-${entry}`} entry={entry} />
                 ))}
               </div>
             )}
