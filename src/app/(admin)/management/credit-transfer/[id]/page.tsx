@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useAdjustChips } from "@/hooks/useUsers";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAdjustChips, useGetUserById } from "@/hooks/useUsers";
 
 type EntityType = "user" | "distributor" | "super-distributor" | "retailer";
 
-function formatCredits(value: string | number | null) {
+function formatCredits(value: string | number | null | undefined) {
   const n = Number(value ?? "");
   if (!Number.isFinite(n)) return value != null ? String(value) : "0";
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,43 +21,34 @@ function backPath(entity: EntityType) {
   return `/management/${entity}`;
 }
 
+function isHouseParent(parentRole?: string | null, parentId?: string | null) {
+  return !parentId || parentRole === "admin";
+}
+
 export default function CreditTransferPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const { user: authUser } = useAuth();
   const entity = (searchParams.get("entity") as EntityType | null) ?? "user";
-  const username = searchParams.get("username") ?? params.id;
+  const fallbackUsername = searchParams.get("username") ?? params.id;
 
-  const [availableLabel, setAvailableLabel] = useState("0.00");
+  const { data } = useGetUserById(params.id);
+  const target = data?.data?.user;
+  const username = target?.username ?? fallbackUsername;
+
+  const parentLabel = useMemo(() => {
+    if (!target) return "…";
+    if (isHouseParent(target.parent_role, target.parent_id)) return "Unlimited";
+    return formatCredits(target.parent_chips);
+  }, [target]);
+
+  const parentName = target?.parent_username ?? "—";
+
   const [amount, setAmount] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const adjustMutation = useAdjustChips();
-
-  useEffect(() => {
-    if (authUser?.role === "admin") {
-      setAvailableLabel("Unlimited");
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/auth/profile`, {
-          credentials: "include",
-        });
-        const data = await res.json();
-        const chips = data?.data?.user?.chips ?? authUser?.chips ?? 0;
-        if (!cancelled) setAvailableLabel(formatCredits(chips));
-      } catch {
-        if (!cancelled) setAvailableLabel(formatCredits(authUser?.chips ?? 0));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser]);
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -109,8 +99,12 @@ export default function CreditTransferPage() {
             <span className="font-semibold">{username}</span>
           </div>
           <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-            <span className="text-gray-600">Your available chips:</span>{" "}
-            <span className="font-semibold">{availableLabel}</span>
+            <span className="text-gray-600">Direct parent:</span>{" "}
+            <span className="font-semibold">{parentName}</span>
+          </div>
+          <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+            <span className="text-gray-600">Parent available chips:</span>{" "}
+            <span className="font-semibold">{parentLabel}</span>
           </div>
         </div>
 

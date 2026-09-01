@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useAdjustChips } from "@/hooks/useUsers";
+import { useAdjustChips, useGetUserById } from "@/hooks/useUsers";
 
 type EntityType = "user" | "distributor" | "super-distributor" | "retailer";
 
-function formatCredits(value: string | null) {
+function formatCredits(value: string | number | null | undefined) {
   const n = Number(value ?? "");
-  if (!Number.isFinite(n)) return value ?? "0";
+  if (!Number.isFinite(n)) return value != null ? String(value) : "0";
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -21,19 +21,33 @@ function backPath(entity: EntityType) {
   return `/management/${entity}`;
 }
 
+function isHouseParent(parentRole?: string | null, parentId?: string | null) {
+  return !parentId || parentRole === "admin";
+}
+
 export default function CreditAdjustPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const entity = (searchParams.get("entity") as EntityType | null) ?? "user";
-  const username = searchParams.get("username") ?? params.id;
-  const targetCreditsRaw = searchParams.get("credits");
+  const fallbackUsername = searchParams.get("username") ?? params.id;
+
+  const { data } = useGetUserById(params.id);
+  const target = data?.data?.user;
+  const username = target?.username ?? fallbackUsername;
+
+  const parentLabel = useMemo(() => {
+    if (!target) return "…";
+    if (isHouseParent(target.parent_role, target.parent_id)) return "Unlimited";
+    return formatCredits(target.parent_chips);
+  }, [target]);
+
+  const parentName = target?.parent_username ?? "—";
+  const userBalance = formatCredits(target?.chips ?? searchParams.get("credits"));
 
   const [amount, setAmount] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const opType = "subtract" as const;
-
-  const availableLabel = formatCredits(targetCreditsRaw);
   const [error, setError] = useState<string | null>(null);
 
   const adjustMutation = useAdjustChips();
@@ -88,7 +102,15 @@ export default function CreditAdjustPage() {
           </div>
           <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
             <span className="text-gray-600">User balance:</span>{" "}
-            <span className="font-semibold">{availableLabel}</span>
+            <span className="font-semibold">{userBalance}</span>
+          </div>
+          <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+            <span className="text-gray-600">Direct parent:</span>{" "}
+            <span className="font-semibold">{parentName}</span>
+          </div>
+          <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+            <span className="text-gray-600">Parent chips (returned to):</span>{" "}
+            <span className="font-semibold">{parentLabel}</span>
           </div>
         </div>
 

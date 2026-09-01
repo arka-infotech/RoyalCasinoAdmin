@@ -15,6 +15,7 @@ export interface User {
   parent_id?: string;
   parent_username?: string;
   parent_chips?: number;
+  parent_role?: UserRole | null;
   unique_id?: string;
   password?: string;
 }
