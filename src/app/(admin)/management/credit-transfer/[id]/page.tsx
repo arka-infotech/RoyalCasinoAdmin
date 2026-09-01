@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAdjustChips } from "@/hooks/useUsers";
+import { useAuth } from "@/providers/AuthProvider";
 
 type EntityType = "user" | "distributor" | "super-distributor" | "retailer";
 
-function formatCredits(value: string | null) {
+function formatCredits(value: string | number | null) {
   const n = Number(value ?? "");
-  if (!Number.isFinite(n)) return value ?? "0";
+  if (!Number.isFinite(n)) return value != null ? String(value) : "0";
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -25,20 +26,39 @@ export default function CreditTransferPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const { user: authUser } = useAuth();
   const entity = (searchParams.get("entity") as EntityType | null) ?? "user";
   const username = searchParams.get("username") ?? params.id;
-  const parentBalanceRaw = searchParams.get("parentBalance");
 
-  const parentBalanceLabel = useMemo(() => {
-    if (parentBalanceRaw === 'unlimited') return 'Unlimited';
-    return formatCredits(parentBalanceRaw);
-  }, [parentBalanceRaw]);
-
+  const [availableLabel, setAvailableLabel] = useState("0.00");
   const [amount, setAmount] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const adjustMutation = useAdjustChips();
+
+  useEffect(() => {
+    if (authUser?.role === "admin") {
+      setAvailableLabel("Unlimited");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/auth/profile`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        const chips = data?.data?.user?.chips ?? authUser?.chips ?? 0;
+        if (!cancelled) setAvailableLabel(formatCredits(chips));
+      } catch {
+        if (!cancelled) setAvailableLabel(formatCredits(authUser?.chips ?? 0));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser]);
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,8 +83,8 @@ export default function CreditTransferPage() {
       });
       toast.success(`Transferred ${amt.toLocaleString()} credits to ${username}`);
       router.push(backPath(entity));
-    } catch {
-      setError("Transfer failed. Please check admin password and try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transfer failed. Please check your password and try again.");
     }
   }
 
@@ -89,8 +109,8 @@ export default function CreditTransferPage() {
             <span className="font-semibold">{username}</span>
           </div>
           <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-            <span className="text-gray-600">Available to Transfer:</span>{" "}
-            <span className="font-semibold">{parentBalanceLabel}</span>
+            <span className="text-gray-600">Your available chips:</span>{" "}
+            <span className="font-semibold">{availableLabel}</span>
           </div>
         </div>
 

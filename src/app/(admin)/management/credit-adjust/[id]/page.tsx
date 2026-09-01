@@ -61,8 +61,8 @@ export default function CreditAdjustPage() {
       });
       toast.success(`Adjusted credits for ${username}`);
       router.push(backPath(entity));
-    } catch {
-      setError("Adjust failed. Please check admin password and try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Adjust failed. Please check your password and try again.");
     }
   }
 
@@ -87,7 +87,7 @@ export default function CreditAdjustPage() {
             <span className="font-semibold">{username}</span>
           </div>
           <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-            <span className="text-gray-600">Available to Transfer:</span>{" "}
+            <span className="text-gray-600">User balance:</span>{" "}
             <span className="font-semibold">{availableLabel}</span>
           </div>
         </div>

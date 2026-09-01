@@ -6,8 +6,5 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return proxyToBackend(`/api/users/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ isBlocked: false }),
-  });
+  return proxyToBackend(`/api/users/${id}/unblock`, { method: 'POST' });
 }

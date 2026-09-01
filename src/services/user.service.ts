@@ -49,6 +49,7 @@ export const userService = {
     const res = await apiClient.post<ApiResponse<{ user: User }>>(`/api/users/${id}/adjust-chips`, {
       amount,
       type,
+      password: adminPassword,
       adminPassword,
     });
     return res.data;

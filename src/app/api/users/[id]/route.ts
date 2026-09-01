@@ -42,9 +42,5 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  // Soft-delete via block until hard delete exists on backend
-  return proxyToBackend(`/api/users/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ isBlocked: true }),
-  });
+  return proxyToBackend(`/api/users/${id}`, { method: 'DELETE' });
 }
