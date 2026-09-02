@@ -1,6 +1,7 @@
 import apiClient from "./apiClient";
 import type { User, HierarchyStats, HierarchyOption, ApiResponse } from "@/types/user";
 import type { CreateUserFormData, EditUserFormData } from "@/validators/auth.validator";
+import { withoutHiddenGameIds, withoutHiddenGames } from "@/lib/hiddenGames";
 
 type UpdateUserPayload = Partial<EditUserFormData> & { parentId?: string; isBlocked?: boolean };
 
@@ -92,7 +93,8 @@ export const userService = {
     const res = await apiClient.get<ApiResponse<{ games: { id: string; displayName: string; category?: string }[] }>>(
       "/api/games/catalog"
     );
-    return res.data;
+    const games = withoutHiddenGames(res.data.data?.games ?? []);
+    return { ...res.data, data: { ...res.data.data, games } };
   },
 
   async getUserGames(userId: string) {
@@ -108,12 +110,15 @@ export const userService = {
         }[];
       }>
     >(`/api/users/${userId}/games`);
-    return res.data;
+    const games = withoutHiddenGames(res.data.data?.games ?? []);
+    return { ...res.data, data: { ...res.data.data, games } };
   },
 
   async setUserGames(userId: string, gameIds: string[], enabled: boolean) {
+    const ids = withoutHiddenGameIds(gameIds);
+    if (ids.length === 0) return { success: true, data: { games: [] } };
     const res = await apiClient.put<ApiResponse<{ games: unknown[] }>>(`/api/users/${userId}/games`, {
-      gameIds,
+      gameIds: ids,
       enabled,
     });
     return res.data;
@@ -122,8 +127,8 @@ export const userService = {
   /** Enable selected games and disable the rest from the user's catalog view. */
   async syncUserGameAccess(userId: string, enabledGameIds: string[]) {
     const current = await this.getUserGames(userId);
-    const allIds = (current.data?.games ?? []).map((g) => g.gameId);
-    const enabledSet = new Set(enabledGameIds);
+    const allIds = withoutHiddenGameIds((current.data?.games ?? []).map((g) => g.gameId));
+    const enabledSet = new Set(withoutHiddenGameIds(enabledGameIds));
     const toEnable = allIds.filter((id) => enabledSet.has(id));
     const toDisable = allIds.filter((id) => !enabledSet.has(id));
 

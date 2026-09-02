@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import apiClient from "@/services/apiClient";
+import { withoutHiddenGames } from "@/lib/hiddenGames";
 
 type GameAccessRow = {
   gameId: string;
@@ -38,7 +39,7 @@ export default function GameAccessPage() {
     setLoading(true);
     apiClient
       .get(`/api/users/${userId}/games`)
-      .then((res) => setGames(res.data?.data?.games ?? []))
+      .then((res) => setGames(withoutHiddenGames(res.data?.data?.games ?? [])))
       .catch((e) => toast.error(e.message || "Failed to load game access"))
       .finally(() => setLoading(false));
   }, [userId]);

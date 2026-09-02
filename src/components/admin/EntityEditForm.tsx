@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useHierarchySuperDistributors, useDistributors, useHierarchyRetailers } from "@/hooks/useUsers";
 import type { AuthUser } from "@/providers/AuthProvider";
 import { userService } from "@/services/user.service";
+import { withoutHiddenGames } from "@/lib/hiddenGames";
 
 export type EntityEditFormTitle =
   | "ADD SUPER DISTRIBUTER"
@@ -122,7 +123,7 @@ export default function EntityEditForm({
       try {
         if (isEdit && entityId) {
           const res = await userService.getUserGames(entityId);
-          const games = res.data?.games ?? [];
+          const games = withoutHiddenGames(res.data?.games ?? []);
           if (cancelled) return;
           setGameOptions(
             games.map((g) => ({
@@ -137,7 +138,7 @@ export default function EntityEditForm({
           }));
         } else {
           const res = await userService.getGameCatalog();
-          const games = res.data?.games ?? [];
+          const games = withoutHiddenGames(res.data?.games ?? []);
           if (cancelled) return;
           setGameOptions(
             games.map((g) => ({

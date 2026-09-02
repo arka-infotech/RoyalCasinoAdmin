@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 import { apiPath } from "@/lib/apiPath";
+import { withoutHiddenGames } from "@/lib/hiddenGames";
 
 type GameSettingRow = {
   gameId: string;
@@ -36,9 +37,10 @@ export default function WinPercentagePage() {
           throw new Error(json.error || "Failed to load game settings");
         }
         if (!mounted) return;
-        setRows(json.settings);
+        const settings = withoutHiddenGames(json.settings);
+        setRows(settings);
         const next: WinState = {};
-        for (const row of json.settings) {
+        for (const row of settings) {
           next[row.gameId] = String(row.winRatePct);
         }
         setValues(next);
