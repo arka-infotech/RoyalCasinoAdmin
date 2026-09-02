@@ -10,7 +10,7 @@ export async function recordPanelActivity(
   },
 ) {
   try {
-    await backendFetch('/api/admin/activity-logs', {
+    const res = await backendFetch('/api/admin/activity-logs', {
       method: 'POST',
       body: JSON.stringify({
         action,
@@ -19,6 +19,9 @@ export async function recordPanelActivity(
         details: extra?.details,
       }),
     });
+    if (!res.ok) {
+      console.error('[activity-log] record failed:', res.status);
+    }
   } catch (err) {
     console.error('[activity-log] record failed:', err instanceof Error ? err.message : err);
   }

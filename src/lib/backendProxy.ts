@@ -18,9 +18,10 @@ export async function clientForwardHeaders(): Promise<Record<string, string>> {
   const xff = h.get('x-forwarded-for');
   const xri = h.get('x-real-ip');
   const ua = h.get('user-agent');
+  // Prefer nginx X-Real-IP (actual remote_addr). Fall back to X-Forwarded-For.
+  if (xri) out['x-real-ip'] = xri;
   if (xff) out['x-forwarded-for'] = xff;
   else if (xri) out['x-forwarded-for'] = xri;
-  if (xri) out['x-real-ip'] = xri;
   if (ua) out['user-agent'] = ua;
   return out;
 }
