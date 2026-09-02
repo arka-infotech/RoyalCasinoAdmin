@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
-import { getAdminFromCookies, requireAdminRole } from "@/lib/auth";
-import { writeActivityLog } from "@/lib/activityLog";
-import { getAuthToken } from "@/lib/backendProxy";
+import { requireAdminRole } from "@/lib/auth";
+import { clientForwardHeaders, getAuthToken } from "@/lib/backendProxy";
 
 function resolveBaseUrl() {
   return normalizeGameServerBaseUrl(
@@ -43,11 +42,13 @@ export async function POST(request: NextRequest) {
       gameServerBasePath(),
     );
     const token = await getAuthToken();
+    const forwarded = await clientForwardHeaders();
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...forwarded,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(body),
@@ -69,19 +70,6 @@ export async function POST(request: NextRequest) {
         { ok: false, error: "Game server returned non-JSON response" },
         { status: 502 },
       );
-    }
-
-    if (res.ok) {
-      const admin = await getAdminFromCookies();
-      if (admin) {
-        const gameType = body.gameType || "unknown";
-        const amount = body.amount ?? "-";
-        await writeActivityLog(
-          request,
-          admin,
-          `Admin Add Balance (${gameType}) = ${amount} by ${admin.username}`,
-        );
-      }
     }
 
     return NextResponse.json(json, { status: res.status });

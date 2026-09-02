@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFromCookies, requireAdminRole } from '@/lib/auth';
+import { requireAdminRole } from '@/lib/auth';
 import { proxyToBackend } from '@/lib/backendProxy';
-import { writeActivityLog } from '@/lib/activityLog';
 import { isHiddenGameId, withoutHiddenGames } from '@/lib/hiddenGames';
 
 export async function GET() {
@@ -27,24 +26,8 @@ export async function POST(req: NextRequest) {
 
   const updates = (body.updates ?? []).filter((u) => !isHiddenGameId(u.gameId));
 
-  const res = await proxyToBackend('/api/admin/game-settings/bulk', {
+  return proxyToBackend('/api/admin/game-settings/bulk', {
     method: 'POST',
     body: JSON.stringify({ updates }),
   });
-
-  if (res.status >= 200 && res.status < 300 && updates.length) {
-    const admin = await getAdminFromCookies();
-    if (admin) {
-      const summary = updates
-        .map((u) => `${u.gameId}=${u.winRatePct}%`)
-        .join(', ');
-      await writeActivityLog(
-        req,
-        admin,
-        `Game win rates updated (${summary}) by ${admin.username}`,
-      );
-    }
-  }
-
-  return res;
 }

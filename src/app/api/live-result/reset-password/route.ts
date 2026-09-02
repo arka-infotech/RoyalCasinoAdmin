@@ -4,6 +4,8 @@ import {
   updateLiveResultPassword,
   verifyLiveResultPassword,
 } from "@/lib/live-result-password";
+import { getAdminFromCookies } from "@/lib/auth";
+import { recordPanelActivity } from "@/lib/activityLog";
 
 export async function POST(request: Request) {
   try {
@@ -43,6 +45,13 @@ export async function POST(request: Request) {
     }
 
     await updateLiveResultPassword(newPassword);
+
+    const admin = await getAdminFromCookies();
+    if (admin) {
+      await recordPanelActivity(`${admin.username} changed the live-result password`, {
+        targetType: 'live-result',
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/auth";
 import { buildSubtreeFilter } from "@/lib/hierarchy";
+import { recordPanelActivity } from "@/lib/activityLog";
 
 type DeleteTarget = "wallet" | "history" | "turnover";
 type DeleteMode = "preview" | "delete";
@@ -151,6 +152,16 @@ export async function POST(req: Request) {
 
     const delResult = await pool.query(deleteQuery, params);
     const deletedCount = delResult.rowCount ?? 0;
+
+    if (deletedCount > 0) {
+      await recordPanelActivity(
+        `${admin.username} deleted ${deletedCount} ${target} records from ${fromRaw} to ${toRaw}`,
+        {
+          targetType: 'report',
+          details: { target, from: fromRaw, to: toRaw, deletedCount, userId, gameType },
+        },
+      );
+    }
 
     return NextResponse.json({
       success: true,

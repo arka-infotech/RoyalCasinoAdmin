@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
-import { getAdminFromCookies, requireAdminRole } from "@/lib/auth";
-import { writeActivityLog } from "@/lib/activityLog";
-import { getAuthToken } from "@/lib/backendProxy";
+import { requireAdminRole } from "@/lib/auth";
+import { clientForwardHeaders, getAuthToken } from "@/lib/backendProxy";
 
 function resolveBaseUrl() {
   return normalizeGameServerBaseUrl(
@@ -46,11 +45,13 @@ export async function GET(request: NextRequest) {
     url.searchParams.set("gameType", gameType);
 
     const token = await getAuthToken();
+    const forwarded = await clientForwardHeaders();
     const res = await fetch(url.toString(), {
       method: "GET",
       cache: "no-store",
       headers: {
         Accept: "application/json",
+        ...forwarded,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
@@ -110,11 +111,13 @@ export async function POST(request: NextRequest) {
       process.env.LUCKY_GAME_BASE_PATH ?? process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
     );
     const token = await getAuthToken();
+    const forwarded = await clientForwardHeaders();
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...forwarded,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ ...body, winRatePct: backendValue }),
@@ -126,14 +129,6 @@ export async function POST(request: NextRequest) {
         { ok: false, error: `Game server returned empty body (${res.status})` },
         { status: 502 },
       );
-    }
-
-    if (res.ok) {
-      const admin = await getAdminFromCookies();
-      if (admin) {
-        const gameType = body.gameType || 'unknown';
-        await writeActivityLog(request, admin, `Admin Win Percentage (${gameType}) set to ${adminValue}% (backend: ${backendValue}%) by ${admin.username}`);
-      }
     }
 
     const json = JSON.parse(text) as { ok: boolean; winRatePct?: number; [key: string]: unknown };

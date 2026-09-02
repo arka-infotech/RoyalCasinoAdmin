@@ -65,7 +65,6 @@ export default function LogsPage() {
 
   const apiParams = useMemo(() => ({
     ...(selectedDate && { from_date: selectedDate, to_date: selectedDate }),
-    method: "POST",
     ...(searchQuery.trim() && { search: searchQuery.trim() }),
     page: currentPage,
     limit: entriesPerPage,

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
 import { withGameServerBasePath } from "@/lib/gameServerBasePath";
-import { getAdminFromCookies, requireAdminRole } from "@/lib/auth";
-import { writeActivityLog } from "@/lib/activityLog";
-import { getAuthToken } from "@/lib/backendProxy";
+import { requireAdminRole } from "@/lib/auth";
+import { clientForwardHeaders, getAuthToken } from "@/lib/backendProxy";
 
 export async function POST(request: NextRequest) {
   const guard = await requireAdminRole();
@@ -15,7 +14,6 @@ export async function POST(request: NextRequest) {
   const base = normalizeGameServerBaseUrl(
     process.env.LUCKY_GAME_SERVER_URL ??
       process.env.NEXT_PUBLIC_LUCKY_GAME_SERVER_URL ??
-      // Backward-compatible fallback to your existing env name.
       process.env.NEXT_PUBLIC_GAME_SOCKET_URL,
   );
 
@@ -37,10 +35,12 @@ export async function POST(request: NextRequest) {
       process.env.LUCKY_GAME_BASE_PATH ?? process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
     );
     const token = await getAuthToken();
+    const forwarded = await clientForwardHeaders();
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...forwarded,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(body),
@@ -61,16 +61,6 @@ export async function POST(request: NextRequest) {
         { ok: false, error: "Game server returned non-JSON response" },
         { status: 502 },
       );
-    }
-
-    if (res.ok) {
-      const admin = await getAdminFromCookies();
-      if (admin) {
-        const gameType = body.gameType || 'unknown';
-        const winCard = body.winCard || '-';
-        const reward = body.reward ?? '-';
-        await writeActivityLog(request, admin, `Admin Manual Result (${gameType}) = [ ${winCard} , ${reward}x ] ${admin.username}`);
-      }
     }
 
     return NextResponse.json(data as object, { status: res.status });

@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { COOKIE_NAME } from '@/lib/auth';
 
@@ -11,15 +11,33 @@ export async function getAuthToken(): Promise<string | null> {
   return cookieStore.get(COOKIE_NAME)?.value ?? null;
 }
 
+/** Client IP / UA so the backend audit log is not 127.0.0.1. */
+export async function clientForwardHeaders(): Promise<Record<string, string>> {
+  const h = await headers();
+  const out: Record<string, string> = {};
+  const xff = h.get('x-forwarded-for');
+  const xri = h.get('x-real-ip');
+  const ua = h.get('user-agent');
+  if (xff) out['x-forwarded-for'] = xff;
+  else if (xri) out['x-forwarded-for'] = xri;
+  if (xri) out['x-real-ip'] = xri;
+  if (ua) out['user-agent'] = ua;
+  return out;
+}
+
 export async function backendFetch(
   path: string,
   init: RequestInit & { token?: string | null } = {},
 ): Promise<Response> {
-  const { token, headers, ...rest } = init;
+  const { token, headers: initHeaders, ...rest } = init;
   const authToken = token === undefined ? await getAuthToken() : token;
   const url = `${getBackendBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
 
-  const mergedHeaders = new Headers(headers);
+  const mergedHeaders = new Headers(initHeaders);
+  const forwarded = await clientForwardHeaders();
+  for (const [key, value] of Object.entries(forwarded)) {
+    if (!mergedHeaders.has(key)) mergedHeaders.set(key, value);
+  }
   if (!mergedHeaders.has('Content-Type') && rest.body) {
     mergedHeaders.set('Content-Type', 'application/json');
   }
