@@ -61,7 +61,7 @@ export default function EntityEditForm({
   loggedInUser,
 }: Props) {
   const router = useRouter();
-  const showGames = role === "user";
+  const showGames = role === "user" && isEdit;
 
   const safeReturnTo = useMemo(() => {
     if (typeof window === "undefined") return null;

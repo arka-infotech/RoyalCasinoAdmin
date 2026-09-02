@@ -23,6 +23,7 @@ export async function PUT(
   if (body.commissionRate !== undefined) payload.commissionRate = body.commissionRate;
   if (body.creditBalance !== undefined) payload.creditBalance = body.creditBalance;
   if (body.isBlocked !== undefined) payload.isBlocked = body.isBlocked;
+  if (typeof body.parentId === 'string' && body.parentId) payload.parentId = body.parentId;
 
   return proxyToBackend(`/api/users/${id}`, {
     method: 'PATCH',

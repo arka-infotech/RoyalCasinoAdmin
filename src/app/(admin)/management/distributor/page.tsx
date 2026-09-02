@@ -182,7 +182,16 @@ export default function DistributorPage() {
     <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900 md:text-xl">Distributor</h1>
-        <Link href="/management/distributor/add" className="rounded bg-indigo-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-600 md:text-sm">Add Distributor</Link>
+        <Link
+          href={
+            parentId
+              ? `/management/distributor/add?superDistributorId=${encodeURIComponent(parentId)}&returnTo=${encodeURIComponent(currentReturnTo)}`
+              : "/management/distributor/add"
+          }
+          className="rounded bg-indigo-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-600 md:text-sm"
+        >
+          Add Distributor
+        </Link>
       </div>
 
       {parentId && parentName && (

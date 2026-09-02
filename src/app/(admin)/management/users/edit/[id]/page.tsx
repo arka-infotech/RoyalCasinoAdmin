@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useGetUserById, useUpdateUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
@@ -42,8 +43,13 @@ export default function UserEditPage({ params }: { params: Promise<{ id: string 
         retailerId: user?.parent_id ?? "",
       }}
       onSubmit={async (values) => {
-        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean } = {
+        if (!values.retailerId) {
+          toast.error("Please select a Retailer");
+          return;
+        }
+        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean; parentId?: string } = {
           isBlocked: values.status === "deactive",
+          parentId: values.retailerId,
         };
         if (values.password.trim().length >= 6) {
           updatePayload.password = values.password.trim();

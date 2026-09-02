@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TablePaginationFooter } from "@/components/admin/TablePaginationFooter";
 import HierarchyBreadcrumb from "@/components/admin/HierarchyBreadcrumb";
+import DrillDownUsername from "@/components/admin/DrillDownUsername";
 import { useDownline, useDeleteUser, useBlockUser, useUnblockUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
-import { ROLE_LABELS } from "@/lib/hierarchyDrillDown";
+import { getDirectChildRole, ROLE_LABELS } from "@/lib/hierarchyDrillDown";
 import type { User, UserRole } from "@/types/user";
 
 type ActionKey = "edit" | "changePassword" | "view" | "disable" | "delete";
@@ -139,6 +141,40 @@ export default function DownlinePage() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
 
+  const currentReturnTo = useMemo(() => {
+    const qs = searchParams.toString();
+    return qs ? `/management/downline?${qs}` : "/management/downline";
+  }, [searchParams]);
+
+  const childRole = parentRole ? getDirectChildRole(parentRole) : null;
+  const listRole = Array.isArray(childRole) ? null : childRole;
+  const pageTitle =
+    listRole === "retailer" ? "Retailer" : listRole === "user" ? "Users" : listRole === "distributor" ? "Distributor" : "Downline";
+
+  const createChild = useMemo(() => {
+    if (!parentId || !parentRole) return null;
+    const returnTo = encodeURIComponent(currentReturnTo);
+    if (parentRole === "distributor") {
+      return {
+        href: `/management/retailer/add?distributorId=${encodeURIComponent(parentId)}&returnTo=${returnTo}`,
+        label: "Add Retailer",
+      };
+    }
+    if (parentRole === "retailer") {
+      return {
+        href: `/management/users/add?retailerId=${encodeURIComponent(parentId)}&returnTo=${returnTo}`,
+        label: "Add User",
+      };
+    }
+    if (parentRole === "super_distributor") {
+      return {
+        href: `/management/distributor/add?superDistributorId=${encodeURIComponent(parentId)}&returnTo=${returnTo}`,
+        label: "Add Distributor",
+      };
+    }
+    return null;
+  }, [parentId, parentRole, currentReturnTo]);
+
   useEffect(() => {
     if (!parentId) {
       router.replace("/management/distributor");
@@ -186,7 +222,15 @@ export default function DownlinePage() {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900 md:text-xl">Downline</h1>
+        <h1 className="text-lg font-semibold text-gray-900 md:text-xl">{pageTitle}</h1>
+        {createChild && (
+          <Link
+            href={createChild.href}
+            className="rounded bg-indigo-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-600 md:text-sm"
+          >
+            {createChild.label}
+          </Link>
+        )}
       </div>
 
       {parentName && (
@@ -230,13 +274,20 @@ export default function DownlinePage() {
               ))
             ) : currentEntries.length === 0 ? (
               <tr><td colSpan={8} className="border border-gray-200 px-3 py-8 text-center text-gray-500">
-                {searchQuery ? "No results found." : parentName ? `No downline entries under ${parentName}.` : "No records found."}
+                {searchQuery ? "No results found." : parentName ? `No ${pageTitle.toLowerCase()} under ${parentName}.` : "No records found."}
               </td></tr>
             ) : (
               currentEntries.map((row, idx) => (
                 <tr key={row.id} className="text-gray-700">
                   <td className="border border-gray-200 px-3 py-3">{startIndex + idx + 1}</td>
-                  <td className="border border-gray-200 px-3 py-3">{row.username}</td>
+                  <td className="border border-gray-200 px-3 py-3">
+                    <DrillDownUsername
+                      id={row.id}
+                      username={row.username}
+                      role={row.role}
+                      returnTo={currentReturnTo}
+                    />
+                  </td>
                   <td className="border border-gray-200 px-3 py-3">{roleLabel(row.role)}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.parent_username ?? "—"}</td>
                   <td className="border border-gray-200 px-3 py-3">{row.unique_id ?? "—"}</td>

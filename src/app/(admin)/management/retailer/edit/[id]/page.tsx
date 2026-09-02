@@ -2,10 +2,10 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useGetUserById, useUpdateUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
-import { userService } from "@/services/user.service";
 import type { EditUserFormData } from "@/validators/auth.validator";
 
 export default function RetailerEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,9 +42,14 @@ export default function RetailerEditPage({ params }: { params: Promise<{ id: str
         distributorId: user?.parent_id ?? "",
       }}
       onSubmit={async (values) => {
-        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean } = {
+        if (!values.distributorId) {
+          toast.error("Please select a Distributor");
+          return;
+        }
+        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean; parentId?: string } = {
           commissionRate: values.commission ? parseFloat(values.commission) : undefined,
           isBlocked: values.status === "deactive",
+          parentId: values.distributorId,
         };
         if (values.password.trim().length >= 6) {
           updatePayload.password = values.password.trim();
@@ -53,7 +58,6 @@ export default function RetailerEditPage({ params }: { params: Promise<{ id: str
           id,
           data: updatePayload,
         });
-        await userService.syncUserGameAccess(user?.id ?? id, values.enabledGameIds);
         router.push("/management/retailer");
       }}
     />

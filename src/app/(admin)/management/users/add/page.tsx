@@ -1,16 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useCreateUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
-import { userService } from "@/services/user.service";
 
 export default function AddUserPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutateAsync: createUser } = useCreateUser();
   const { user } = useAuth();
+  const retailerId = searchParams.get("retailerId") ?? "";
+  const returnTo = searchParams.get("returnTo");
+  const afterSave = returnTo?.startsWith("/") ? returnTo : "/management/users";
 
   return (
     <EntityEditForm
@@ -18,6 +21,7 @@ export default function AddUserPage() {
       role="user"
       submitLabel="Submit"
       loggedInUser={user}
+      initialValues={retailerId ? { retailerId } : undefined}
       onSubmit={async (values) => {
         if (!values.username.trim()) {
           toast.error("Username is required");
@@ -32,7 +36,7 @@ export default function AddUserPage() {
           return;
         }
 
-        const created = await createUser({
+        await createUser({
           username: values.username.trim(),
           password: values.password,
           role: "user",
@@ -40,12 +44,7 @@ export default function AddUserPage() {
           parentId: values.retailerId,
         });
 
-        const newId = created.data?.user?.id;
-        if (newId && values.enabledGameIds.length > 0) {
-          await userService.setUserGames(newId, values.enabledGameIds, true);
-        }
-
-        router.push("/management/users");
+        router.push(afterSave);
       }}
     />
   );

@@ -9,6 +9,12 @@ import { toast } from "sonner";
 
 type UpdateUserPayload = Partial<EditUserFormData> & { parentId?: string; isBlocked?: boolean };
 
+function invalidateDirectory(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["users"] });
+  qc.invalidateQueries({ queryKey: ["hierarchy"] });
+  qc.invalidateQueries({ queryKey: ["user"] });
+}
+
 export function useSuperDistributors() {
   return useQuery({ queryKey: ["users", "super_distributor"], queryFn: () => userService.getUsers({ role: "super_distributor", limit: 500 }) });
 }
@@ -17,6 +23,8 @@ export function useDistributors(parentId?: string) {
   return useQuery({
     queryKey: ["users", "distributor", parentId],
     queryFn: () => userService.getUsers({ role: "distributor", ...(parentId && { parent_id: parentId }), limit: 500 }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -76,6 +84,8 @@ export function useHierarchySuperDistributors() {
       const res = await userService.getSuperDistributorsForDropdown();
       return res.data?.superDistributors ?? [];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -87,6 +97,8 @@ export function useHierarchyDistributors(superDistributorId?: string) {
       return res.data?.distributors ?? [];
     },
     enabled: !!superDistributorId,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -95,6 +107,8 @@ export function useHierarchyRetailers(distributorId?: string) {
     queryKey: ["hierarchy", "retailers", distributorId],
     queryFn: () => userService.getUsers({ role: "retailer", ...(distributorId && { parent_id: distributorId }), limit: 500 }),
     enabled: true,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -103,7 +117,7 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (data: CreateUserFormData) => userService.createUser(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateDirectory(qc);
       toast.success("User created successfully");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -115,7 +129,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserPayload }) => userService.updateUser(id, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateDirectory(qc);
       toast.success("User updated successfully");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -127,7 +141,7 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: (id: string) => userService.deleteUser(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateDirectory(qc);
       toast.success("User deleted");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -139,7 +153,7 @@ export function useBlockUser() {
   return useMutation({
     mutationFn: (id: string) => userService.blockUser(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateDirectory(qc);
       toast.success("User blocked");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -151,7 +165,7 @@ export function useUnblockUser() {
   return useMutation({
     mutationFn: (id: string) => userService.unblockUser(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateDirectory(qc);
       toast.success("User unblocked");
     },
     onError: (e: Error) => toast.error(e.message),

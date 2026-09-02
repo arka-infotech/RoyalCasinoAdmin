@@ -1,16 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useCreateUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
-import { userService } from "@/services/user.service";
 
 export default function AddRetailerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutateAsync: createUser } = useCreateUser();
   const { user } = useAuth();
+  const distributorId = searchParams.get("distributorId") ?? "";
+  const returnTo = searchParams.get("returnTo");
+  const afterSave = returnTo?.startsWith("/") ? returnTo : "/management/retailer";
 
   return (
     <EntityEditForm
@@ -18,6 +21,7 @@ export default function AddRetailerPage() {
       role="retailer"
       submitLabel="Submit"
       loggedInUser={user}
+      initialValues={distributorId ? { distributorId } : undefined}
       onSubmit={async (values) => {
         if (!values.username.trim()) {
           toast.error("Username is required");
@@ -32,7 +36,7 @@ export default function AddRetailerPage() {
           return;
         }
 
-        const created = await createUser({
+        await createUser({
           username: values.username.trim(),
           password: values.password,
           role: "retailer",
@@ -40,12 +44,7 @@ export default function AddRetailerPage() {
           parentId: values.distributorId,
         });
 
-        const newId = created.data?.user?.id;
-        if (newId && values.enabledGameIds.length > 0) {
-          await userService.setUserGames(newId, values.enabledGameIds, true);
-        }
-
-        router.push("/management/retailer");
+        router.push(afterSave);
       }}
     />
   );

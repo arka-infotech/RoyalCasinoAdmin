@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useCreateUser } from "@/hooks/useUsers";
@@ -8,8 +8,12 @@ import { useAuth } from "@/providers/AuthProvider";
 
 export default function AddDistributorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutateAsync: createUser } = useCreateUser();
   const { user } = useAuth();
+  const superDistributorId = searchParams.get("superDistributorId") ?? "";
+  const returnTo = searchParams.get("returnTo");
+  const afterSave = returnTo?.startsWith("/") ? returnTo : "/management/distributor";
 
   return (
     <EntityEditForm
@@ -17,6 +21,7 @@ export default function AddDistributorPage() {
       role="distributor"
       submitLabel="Submit"
       loggedInUser={user}
+      initialValues={superDistributorId ? { superDistributorId } : undefined}
       onSubmit={async (values) => {
         if (!values.username.trim()) {
           toast.error("Username is required");
@@ -39,7 +44,7 @@ export default function AddDistributorPage() {
           parentId: values.superDistributorId,
         });
 
-        router.push("/management/distributor");
+        router.push(afterSave);
       }}
     />
   );

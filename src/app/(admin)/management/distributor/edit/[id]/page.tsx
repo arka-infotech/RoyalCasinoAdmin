@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import EntityEditForm from "@/components/admin/EntityEditForm";
 import { useGetUserById, useUpdateUser } from "@/hooks/useUsers";
 import { useAuth } from "@/providers/AuthProvider";
@@ -40,9 +41,14 @@ export default function DistributorEditPage({ params }: { params: Promise<{ id: 
         superDistributorId: user?.parent_id ?? "",
       }}
       onSubmit={async (values) => {
-        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean } = {
+        if (!values.superDistributorId) {
+          toast.error("Please select a Super Distributor");
+          return;
+        }
+        const updatePayload: Partial<EditUserFormData> & { isBlocked?: boolean; parentId?: string } = {
           commissionRate: values.commission ? parseFloat(values.commission) : undefined,
           isBlocked: values.status === "deactive",
+          parentId: values.superDistributorId,
         };
         if (values.password.trim().length >= 6) {
           updatePayload.password = values.password.trim();
