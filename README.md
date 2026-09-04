@@ -1,6 +1,6 @@
-# Royal Casino Admin
+# Balaji Admin
 
-Next.js admin panel (based on sai-lucky-admin) for Royal Casino.
+Next.js admin panel for Balaji.
 
 ## Hierarchy
 

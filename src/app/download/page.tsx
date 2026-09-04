@@ -33,7 +33,7 @@ const initial: PlatformState = {
   downloading: false,
 };
 
-const APP_TITLE = "Royal Casino"
+const APP_TITLE = "Balaji"
 
 function fetchManifest(url: string) {
   const bust = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;

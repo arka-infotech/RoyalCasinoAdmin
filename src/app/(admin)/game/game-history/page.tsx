@@ -54,7 +54,7 @@ export default function GameHistoryPage() {
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Game History</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Live bet history across all players for every implemented Royal Casino game.
+            Live bet history across all players for every implemented Balaji game.
           </p>
         </div>
         <span
