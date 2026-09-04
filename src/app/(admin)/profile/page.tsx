@@ -22,6 +22,14 @@ export default function AdminProfilePage() {
       toast.error("New password and confirm password do not match");
       return;
     }
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      toast.error("New password must be different from the current password");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
