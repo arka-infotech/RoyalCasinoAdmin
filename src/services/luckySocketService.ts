@@ -1,7 +1,7 @@
 "use client";
 
 import io from "socket.io-client";
-import { withGameServerBasePath } from "@/lib/gameServerBasePath";
+import { getBrowserSocketConfig } from "@/lib/gameServerBaseUrl";
 
 // The project uses a Socket.IO client build whose type exports differ by version/bundler.
 // Keep this service runtime-focused and avoid coupling to the exported `Socket` type.
@@ -9,14 +9,10 @@ let socket: any = null;
 
 export function getLuckySocket(): any {
   if (!socket || !socket.connected) {
-    const url = process.env.NEXT_PUBLIC_GAME_SOCKET_URL || "http://localhost:3000";
-    const socketPath = withGameServerBasePath(
-      "/socket.io",
-      process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
-    );
-    socket = io(url, {
+    const { origin, path } = getBrowserSocketConfig();
+    socket = io(origin, {
       transports: ["websocket"],
-      path: socketPath,
+      path,
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,

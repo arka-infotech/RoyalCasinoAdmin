@@ -20,7 +20,6 @@ export function normalizeGameServerBasePath(raw: string | undefined | null): str
 
   // Accept accidental endpoint values and collapse to the shared base path.
   s = s.replace(/\/socket\.io$/i, "");
-  s = s.replace(/\/api$/i, "");
 
   return s === "/" ? "" : s;
 }

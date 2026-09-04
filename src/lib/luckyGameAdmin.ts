@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
 
-import { normalizeGameServerBaseUrl } from "@/lib/gameServerBaseUrl";
-import { withGameServerBasePath } from "@/lib/gameServerBasePath";
+import { getBrowserSocketConfig } from "@/lib/gameServerBaseUrl";
 
 /** Admin UI suit → backend single-letter suit (confirmed against RoyalCasino's Lucky12_Manager.cs / Lucky16_Manager.cs). */
 export type UiSuit = "heart" | "spade" | "diamond" | "club";
@@ -353,32 +352,11 @@ export function useLiveResultAdminSocket(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const baseUrl =
-      typeof window !== "undefined"
-        ? normalizeGameServerBaseUrl(process.env.NEXT_PUBLIC_LUCKY_GAME_SERVER_URL)
-        : null;
+    const { origin, path } = getBrowserSocketConfig();
 
-    const baseUrlFallback =
-      typeof window !== "undefined"
-        ? normalizeGameServerBaseUrl(process.env.NEXT_PUBLIC_LUCKY_GAME_SERVER_URL ?? process.env.NEXT_PUBLIC_GAME_SOCKET_URL)
-        : null;
-
-    const finalBaseUrl = baseUrlFallback ?? baseUrl;
-    const socketPath = withGameServerBasePath(
-      "/socket.io",
-      process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
-    );
-
-    if (!finalBaseUrl) {
-      setError(null);
-      setConnected(false);
-      return;
-    }
-
-    const socket = io(finalBaseUrl, {
-      // Start with polling (more reliable through Nginx proxy) then upgrade to websocket.
+    const socket = io(origin, {
       transports: ["polling", "websocket"],
-      path: socketPath,
+      path,
     });
 
     socket.on("connect", () => {
@@ -457,32 +435,11 @@ export function useAdminGameHistorySocket(params: {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const baseUrl =
-      typeof window !== "undefined"
-        ? normalizeGameServerBaseUrl(process.env.NEXT_PUBLIC_LUCKY_GAME_SERVER_URL)
-        : null;
+    const { origin, path } = getBrowserSocketConfig();
 
-    const baseUrlFallback =
-      typeof window !== "undefined"
-        ? normalizeGameServerBaseUrl(process.env.NEXT_PUBLIC_LUCKY_GAME_SERVER_URL ?? process.env.NEXT_PUBLIC_GAME_SOCKET_URL)
-        : null;
-
-    const finalBaseUrl = baseUrlFallback ?? baseUrl;
-    const socketPath = withGameServerBasePath(
-      "/socket.io",
-      process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH,
-    );
-
-    if (!finalBaseUrl) {
-      setError(null);
-      setConnected(false);
-      return;
-    }
-
-    const socket = io(finalBaseUrl, {
-      // Start with polling (more reliable through Nginx proxy) then upgrade to websocket.
+    const socket = io(origin, {
       transports: ["polling", "websocket"],
-      path: socketPath,
+      path,
     });
     let lastRefetchAt = 0;
     let trailingTimer: ReturnType<typeof setTimeout> | null = null;

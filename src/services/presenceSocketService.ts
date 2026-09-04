@@ -1,6 +1,7 @@
 "use client";
 
 import io from "socket.io-client";
+import { getBrowserSocketConfig } from "@/lib/gameServerBaseUrl";
 
 export type PresencePayload = {
   userId: string;
@@ -20,10 +21,6 @@ let socket: any = null;
 const listeners = new Set<PresenceListener>();
 const connectListeners = new Set<ConnectListener>();
 let connecting: Promise<any | null> | null = null;
-
-function getSocketUrl() {
-  return process.env.NEXT_PUBLIC_GAME_SOCKET_URL || "http://localhost:3000";
-}
 
 async function fetchWsToken(): Promise<string | null> {
   try {
@@ -71,8 +68,10 @@ export async function connectPresenceSocket(): Promise<any | null> {
       socket = null;
     }
 
-    socket = io(getSocketUrl(), {
+    const { origin, path } = getBrowserSocketConfig();
+    socket = io(origin, {
       transports: ["websocket", "polling"],
+      path,
       auth: { token },
       autoConnect: true,
       reconnection: true,

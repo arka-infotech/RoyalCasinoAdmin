@@ -15,7 +15,7 @@ export function getGameServerBasePath(): string {
     process.env.APP_UPDATES_BASE_PATH ??
     process.env.LUCKY_GAME_BASE_PATH ??
     process.env.NEXT_PUBLIC_LUCKY_GAME_BASE_PATH ??
-    "/shree-sai"
+    ""
   );
 }
 
